@@ -53,7 +53,7 @@ float _camPos[3] = { 0.0,0.0,-1.1 };
 bool recording = false;
 
 // slider
-float _slider = 0.1f;
+float _slider = 1.0f;
 
 // ray marching box info
 float _boxScale[3] = {0.5,0.5,0.5};
@@ -98,7 +98,7 @@ void draw_gui()
    ImGui::SliderFloat("View angle", &viewAngle, -PI, +PI);
    ImGui::SliderFloat3("Box Scale", _boxScale, 0.1f, 2.0f);
    ImGui::SliderFloat3("Box Pos", _boxPos, -1.0f, 1.0f);
-   ImGui::SliderFloat("Slider", &_slider, 0.0f, 1.0f);
+   ImGui::SliderFloat("Slider", &_slider, 1.0f, 2.0f);
 
    //ImGui::Image((void*)texture_id, ImVec2(128,128));
    if (ImGui::Button("Reset Scene"))
@@ -201,16 +201,17 @@ void idle()
 }
 void reset_scene()
 {
-	viewAngle = 0.0f;
+	viewAngle = -PI;
 	_camPos[0] = 0.0f;
 	_camPos[1] = 0.0f;
 	_camPos[2] = -1.1f;
-	_boxScale[0] = 0.2f;
-	_boxScale[1] = 0.2f;
-	_boxScale[2] = 0.2f;
+	_boxScale[0] = 0.5f;
+	_boxScale[1] = 0.5f;
+	_boxScale[2] = 0.5f;
 	_boxPos[0] = 0.0f;
 	_boxPos[1] = 0.0f;
 	_boxPos[2] = 0.0f;
+	_slider = 1.0f;
 }
 
 void reload_shader()

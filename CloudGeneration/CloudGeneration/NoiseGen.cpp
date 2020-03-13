@@ -114,26 +114,17 @@ void NoiseGen::GenCloudTexture(GLuint &cloud_texture)
 				// coord (0,1) fo 3D tex
 				vec3 pos = vec3(x, y, z) / float(N);
 
-				float random;
-				
 				//Low freq Perlin-Worley
-				random = Remap(GetRandom(), 0, 1, 0.9, 1);
-				R = (GetPerlinValue(pos, W_l) * random);
+				R = (GetPerlinValue(pos, W_l));
+				if (R < 0) R = 0;
+				//Medium freq Worley
+				G = GetWorleyVaule(pos, W_l);
 
-				G = 0;
-				B = 0;
-				A = 0;
-				////Medium freq Worley
-				//random = Remap(GetRandom(), 0, 1, 0.9, 1);
-				//G = GetWorleyVaule(pos, W_m) * random;
+				//High freq Worley
+				B = GetWorleyVaule(pos, W_m);
 
-				////High freq Worley
-				//random = Remap(GetRandom(), 0, 1, 0.9, 1);
-				//B = GetWorleyVaule(pos, W_h) * random;
-
-				////Higest freq Worly
-				//random = Remap(GetRandom(), 0, 1, 0.9, 1);
-				//A = GetWorleyVaule(pos, W_hst) * random;
+				//Higest freq Worly
+				A = GetWorleyVaule(pos, W_h);
 
 				cloud[x * N * N + y * N + z] = vec4(R,G,B,A);
 

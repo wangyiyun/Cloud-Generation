@@ -12,7 +12,7 @@ out vec4 fragcolor;
 in vec2 tex_coord;
 
 vec2 uv;	// current pixel pos on screen
-const int RAY_MARCHING_STEPS = 32;
+const int RAY_MARCHING_STEPS = 64;
 const float INF = 9999;
 const float EPSILON = 0.0001;
 const float PI = 3.1415926;
@@ -25,13 +25,31 @@ struct Ray
     vec3 direction;
 };
 
-
 Ray CreateRay(vec3 origin, vec3 direction)
 {
     Ray ray;
     ray.origin = origin;
     ray.direction = direction;
     return ray;
+}
+
+struct RayHit{
+	vec3 position;
+	float hitDist;
+	float alpha;
+	float entryPoint;
+	float exitPoint;
+};
+
+RayHit CreateRayHit()
+{
+	RayHit hit;
+	hit.position = vec3(0,0,0);
+	hit.hitDist = INF;
+	hit.alpha = 0;
+	hit.entryPoint = 0;
+	hit.exitPoint = INF;
+	return hit;
 }
 
 Ray CreateCameraRay(vec2 uv)
@@ -47,51 +65,171 @@ Ray CreateCameraRay(vec2 uv)
     return CreateRay(origin, direction);
 }
 
-float SphereDistance(vec3 eye, vec3 centre, float radius) {
-    return distance(eye, centre) - radius;
-}
-
-float CubeDistance(vec3 eye, vec3 centre, vec3 scale) {
-    vec3 o = abs(eye - centre) - scale;
-    float ud = length(max(o,0));
-    float n = max(max(min(o.x,0),min(o.y,0)), min(o.z,0));
-    return ud+n;
-}
-
-float distanceField(vec3 p)
+vec4 AlphaBlend(vec4 a, vec4 b)
 {
-	float cubeDist = CubeDistance(p, _boxPosition, _boxScale);
-//	float sphereDist = SphereDistance(p, vec3(0), _slider);
-	return cubeDist;
+	vec4 result = a;
+	result.xyz = a.xyz * (1 - b.w) + b.xyz * b.w;
+	result.w = 1;
+	return result;
 }
+
+struct Box
+{
+	vec3 position;
+	vec3 scale;
+}_box;
+
+Box CreateBox(vec3 position, vec3 scale)
+{
+	Box box;
+	box.position = position;
+	box.scale = scale;
+	return box;
+}
+
+void IntersectBox(Ray ray, inout RayHit bestHit, Box box)
+{
+	vec3 minBound = box.position - box.scale;
+	vec3 maxBound = box.position + box.scale;
+
+	vec3 t0 = (minBound - ray.origin) / ray.direction;
+	vec3 t1 = (maxBound - ray.origin) / ray.direction;
+
+	vec3 tsmaller = min(t0, t1);
+	vec3 tbigger = max(t0, t1);
+
+	float tmin = max(tsmaller[0], max(tsmaller[1], tsmaller[2]));
+    float tmax = min(tbigger[0], min(tbigger[1], tbigger[2]));
+
+	if(tmin > tmax) return;
+
+	// else
+	// Hit a box!
+	if(tmax > 0 && tmin < bestHit.hitDist)
+	{
+		if(tmin < 0) tmin = 0;
+		bestHit.hitDist = tmin;
+		bestHit.position = ray.origin + bestHit.hitDist * ray.direction;
+		bestHit.alpha = 1;
+		// For volumetric rendering
+		bestHit.entryPoint = tmin;
+		bestHit.exitPoint = tmax;
+	}
+}
+
+vec3 GetLocPos(vec3 pos)
+{
+	return ((pos -_box.position)/_box.scale+1)*0.5;
+//	return pos * _boxScale + _slider;
+}
+
+//float SphereDistance(vec3 eye, vec3 centre, float radius) {
+//    return distance(eye, centre) - radius;
+//}
+//
+//float CubeDistance(vec3 eye, vec3 centre, vec3 scale) {
+//    vec3 o = abs(eye - centre) - scale;
+//    float ud = length(max(o,0));
+//    float n = max(max(min(o.x,0),min(o.y,0)), min(o.z,0));
+//    return ud+n;
+//}
+//
+//float distanceField(vec3 p)
+//{
+//	float cubeDist = CubeDistance(p, _boxPosition, _boxScale);
+////	float sphereDist = SphereDistance(p, vec3(0), _slider);
+//	return cubeDist;
+//}
 
 vec3 Remap(vec3 p)
 {
 	return (p-_boxPosition)/(_boxScale*2) + vec3(0.5);
 }
 
+vec4 GetSkyColor(float y)
+{
+	 y = y*0.5 + 0.5;
+	return vec4(vec3(1 - y,1 - y,0.7),1);
+}
+
+vec3 sunPos = vec3(5,5,5);
+float lightMarch(vec3 p)
+{
+	float light = 0; 
+	vec3 lightDir = normalize(sunPos - p);
+	float stepSize = distance(sunPos, p) / 4.0;
+	for(int i = 0; i < 4; i++)
+	{
+		float density = texture(_CloudTexture, GetLocPos(p)).r;
+		if(density > 0.1f) light += exp(-density);
+		p += lightDir*stepSize;
+	}
+	return light;
+}
+
+float SampleDensity(vec3 p)
+{
+	vec4 cloudShape =  texture(_CloudTexture, p);
+	return cloudShape.r;
+}
+
+void Volume(Ray ray, RayHit hit, inout vec4 result)
+{
+	vec3 start = hit.position;
+	vec3 end = hit.position + ray.direction*(hit.exitPoint-hit.entryPoint);
+	float len = distance(start,end);
+	float stepSize = len / float(RAY_MARCHING_STEPS);
+//	int num = int(len/stepSize);
+
+	vec3 eachStep =  stepSize * normalize(end - start);
+	vec3 currentPos = start;
+
+	 // https://www.youtube.com/watch?v=4QOcCGI6xOU
+	 // exp for lighting
+	vec3 localPos;
+	float totalDensity = 0;
+	 for(int i = 0; i < RAY_MARCHING_STEPS; i++)
+	 {
+	 	localPos = GetLocPos(currentPos);
+	 	
+		float density = SampleDensity(localPos);
+		if(density > 0)
+		{
+			totalDensity += density*stepSize;
+		}
+	 	currentPos += eachStep;
+	 }
+	float transmittance = exp(-totalDensity);
+	 result = result * transmittance + totalDensity*_slider;
+	// Debug
+//	localPos = GetLocPos(currentPos);
+//	vec4 currentColor = vec4(texture(_CloudTexture,localPos).a);
+////	vec4 currentColor = texture(_cloud,localPos);
+//	result += currentColor;
+
+//	result = currentColor;
+}
+
+RayHit CastRay(Ray ray)
+{
+	RayHit bestHit = CreateRayHit();
+	IntersectBox(ray, bestHit, _box);
+	return bestHit;
+}
+
 void main(void)
 {   
-//	fragcolor = texture(diffuse_color, tex_coord);
+	// uv (-1,1)
 	uv = (vec2(gl_FragCoord.xy) + vec2(0.5, 0.5))/windowSize.xy * 2.0 - 1.0;
 	// Get a ray for the UVs
     Ray ray = CreateCameraRay(uv);
-	vec4 result = vec4(vec3(ray.direction.y * 0.5f + 0.5f), 1.0f);
-	int marchSteps = 0;
-	float rayDist = 0;
-	float density = 0;
-	while(rayDist < MAX_DIST)
+	vec4 result = GetSkyColor(-ray.direction.y);
+	_box = CreateBox(_boxPosition, _boxScale);
+	RayHit hit = CreateRayHit();
+	hit = CastRay(ray);
+	if(hit.alpha != 0)
 	{
-		marchSteps++;
-		float dist = distanceField(ray.origin);
-		if(dist <= EPSILON)
-		{
-			vec3 localPos = Remap(ray.origin);
-			result = vec4(texture(_CloudTexture, localPos).r);	
-			break;
-		}
-		ray.origin += ray.direction * dist;
-        rayDist += dist;
+		Volume(ray,hit,result);
 	}
 	fragcolor = result;
 }
