@@ -12,13 +12,14 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include <iostream>
-
+using namespace std;
 #include "InitShader.h"
 #include "LoadMesh.h"
 #include "LoadTexture.h"
 #include "imgui_impl_glut.h"
 #include "VideoMux.h"
 #include "include/trackball.h"
+#include "NoiseGen.h"
 
 //names of the shader files to load
 static const std::string vertex_shader("CloudGeneration_vs.glsl");
@@ -30,8 +31,10 @@ GLuint texture_id = -1; //Texture map for fish
 GLuint quad_vao = -1;
 GLuint quad_vbo = -1;
 
-GLuint fbo_id = -1;       // Framebuffer object
-GLuint fbo_texture = -1;  // Texture rendered into
+//GLuint fbo_id = -1;       // Framebuffer object
+
+GLuint quad_texture = -1;  // Texture rendered into
+GLuint cloud_texture = -1;  // Texture rendered into
 
 //names of the mesh and texture files to load
 static const std::string mesh_name = "Amago0.obj";
@@ -41,16 +44,19 @@ static const std::string texture_name = "AmagoT.bmp";
 TrackBallC trackball;
 bool mouseLeft, mouseMid, mouseRight;
 
+const float  PI = 3.141592f;
+
 MeshData mesh_data;
 float time_sec = 0.0f;
-float viewAngle = 0.0f;
+float viewAngle = -PI;
 float _camPos[3] = { 0.0,0.0,-1.1 };
 bool recording = false;
 
-// ray marching box info
-// set box at pos(0,0,0)
+// slider
+float _slider = 0.1f;
 
-float _boxScale[3] = {0.2,0.2,0.2};
+// ray marching box info
+float _boxScale[3] = {0.5,0.5,0.5};
 float _boxPos[3] = {0.0,0.0,0.0};
 
 // funcs
@@ -89,9 +95,10 @@ void draw_gui()
    }
 
    //ImGui::SliderFloat3("Cam Pos", _camPos, -1.0f, 1.0f);
-   ImGui::SliderFloat("View angle", &viewAngle, -3.141592f, +3.141592f);
-   ImGui::SliderFloat3("Box Scale", _boxScale, 0.1f, 0.5f);
-   ImGui::SliderFloat3("Pos", _boxPos, -1.0f, 1.0f);
+   ImGui::SliderFloat("View angle", &viewAngle, -PI, +PI);
+   ImGui::SliderFloat3("Box Scale", _boxScale, 0.1f, 2.0f);
+   ImGui::SliderFloat3("Box Pos", _boxPos, -1.0f, 1.0f);
+   ImGui::SliderFloat("Slider", &_slider, 0.0f, 1.0f);
 
    //ImGui::Image((void*)texture_id, ImVec2(128,128));
    if (ImGui::Button("Reset Scene"))
@@ -121,7 +128,7 @@ void display()
 
 	//Make the viewport match the FBO texture size.
 	int tex_w, tex_h;
-	glBindTexture(GL_TEXTURE_2D, fbo_texture);
+	glBindTexture(GL_TEXTURE_2D, quad_texture);
 	glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &tex_w);
 	glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &tex_h);
 
@@ -134,17 +141,19 @@ void display()
 	glMatrixMode(GL_MODELVIEW);
 	trackball.Set3DViewCamera();
 
-	mat4 v = trackball.GetViewMatrix();
+	const float radius = 1.0f;
+	float camX = sin(viewAngle) * radius;
+	float camZ = cos(viewAngle) * radius;
+	glm::mat4 view;
+	view = glm::lookAt(glm::vec3(camX, 0.0, camZ), glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0));
 
-	glm::mat4 M = glm::rotate(viewAngle, glm::vec3(0.0f, 1.0f, 0.0f));
-	glm::mat4 V = glm::lookAt(glm::vec3(_camPos[0], _camPos[1], _camPos[2]), glm::vec3(_boxPos[0], _boxPos[1], _boxPos[2]), glm::vec3(0.0f, 1.0f, 0.0f));
 	glm::mat4 P = glm::perspective(80.0f, aspect_ratio, 0.1f, 100.0f);
 
 	const int size_loc = 1;	// "windowSize"
-	glUniform2f(size_loc, float(glutGet(GLUT_WINDOW_WIDTH)), float(glutGet(GLUT_WINDOW_HEIGHT)));
+	glUniform2f(size_loc, w, h);
 
 	const int V_loc = 2;	//"_CameraToWorld"
-	glUniformMatrix4fv(V_loc, 1, false, glm::value_ptr(V*M));
+	glUniformMatrix4fv(V_loc, 1, false, glm::value_ptr(view));
 
 	const int IP_loc = 3;	//"_CameraInverseProjection"
 	glm::mat4 IP = glm::inverse(P);
@@ -155,6 +164,9 @@ void display()
 
 	const int box_pos_loc = 5;	// "_boxScale"
 	glUniform3f(box_pos_loc, _boxPos[0], _boxPos[1], _boxPos[2]);
+
+	const int slider_loc = 6;	// "_slider"
+	glUniform1f(slider_loc, _slider);
 
 	glBindVertexArray(quad_vao);
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -293,8 +305,8 @@ void initOpenGl()
 	const int h = glutGet(GLUT_SCREEN_HEIGHT);
 
 	// Create FBO texture
-	glGenTextures(1, &fbo_texture);
-	glBindTexture(GL_TEXTURE_2D, fbo_texture);
+	glGenTextures(1, &quad_texture);
+	glBindTexture(GL_TEXTURE_2D, quad_texture);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE, 0);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
@@ -305,13 +317,13 @@ void initOpenGl()
 	////Create the framebuffer object
 	//glGenFramebuffers(1, &fbo_id);
 	//glBindFramebuffer(GL_FRAMEBUFFER, fbo_id);
-	//glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, fbo_texture, 0);
+	//glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, quad_texture, 0);
 
 	//glDrawBuffer(fbo_id);
 
-	check_framebuffer_status();
+	/*check_framebuffer_status();
 
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);*/
 
 }
 
@@ -394,6 +406,18 @@ void mouse(int button, int state, int x, int y)
 	}
 }
 
+void GenNoiseTexture()
+{
+	NoiseGen noiseMaster;
+	noiseMaster.GenCloudTexture(cloud_texture);
+	//cout << cloud_texture << endl;
+	glUseProgram(shader_program);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_3D, cloud_texture);
+	const int tex_loc = 7;		// "_CloudTexture"
+	glUniform1i(tex_loc, 0);
+	glUseProgram(0);
+}
 
 int main (int argc, char **argv)
 {
@@ -420,6 +444,7 @@ int main (int argc, char **argv)
 
 	initOpenGl();
 	ImGui_ImplGlut_Init(); // initialize the imgui system
+	GenNoiseTexture();
 
 	//Enter the glut event loop.
 	glutMainLoop();

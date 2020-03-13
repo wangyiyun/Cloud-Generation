@@ -63,6 +63,9 @@
     <ClInclude Include="include\trackball.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="NoiseGen.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -96,6 +99,9 @@
       <Filter>imgui</Filter>
     </ClCompile>
     <ClCompile Include="CloudGeneration.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="NoiseGen.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
