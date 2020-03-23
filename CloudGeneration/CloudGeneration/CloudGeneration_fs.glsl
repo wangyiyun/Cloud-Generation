@@ -149,7 +149,7 @@ vec3 Remap(vec3 p)
 vec4 GetSkyColor(float y)
 {
 	 y = y*0.5 + 0.5;
-	return vec4(vec3(1 - y,1 - y,0.7),1);
+	return mix(vec4(0.5,0.3,0.5,1.0),skyColor,y);
 }
 
 vec3 sunPos = vec3(5,5,5);
@@ -161,16 +161,16 @@ float lightMarch(vec3 p)
 	for(int i = 0; i < 4; i++)
 	{
 		float density = texture(_CloudTexture, GetLocPos(p)).r;
-		if(density > 0.1f) light += exp(-density);
+		if(density > _slider) light += exp(-i*stepSize);
 		p += lightDir*stepSize;
 	}
 	return light;
 }
 
-float SampleDensity(vec3 p)
+float SampleDensity(vec3 p, float len)
 {
 	vec4 cloudShape =  texture(_CloudTexture, p);
-	return cloudShape.r;
+	return cloudShape.r * exp(-len);
 }
 
 void Volume(Ray ray, RayHit hit, inout vec4 result)
@@ -187,26 +187,27 @@ void Volume(Ray ray, RayHit hit, inout vec4 result)
 	 // https://www.youtube.com/watch?v=4QOcCGI6xOU
 	 // exp for lighting
 	vec3 localPos;
+	vec3 lightColor = vec3(0.7);
+	vec3 cloudColor = vec3(1);
 	float totalDensity = 0;
+	result.w = 0;
 	 for(int i = 0; i < RAY_MARCHING_STEPS; i++)
 	 {
 	 	localPos = GetLocPos(currentPos);
 	 	
-		float density = SampleDensity(localPos);
-		if(density > 0)
+		float opacity = SampleDensity(localPos, i*stepSize);
+		if(opacity > _slider)
 		{
-			totalDensity += density*stepSize;
+			result.xyz = result.xyz * (1 - opacity) + cloudColor * opacity;
+			result.w += opacity;
 		}
+		if(result.w >= 1) break;
 	 	currentPos += eachStep;
 	 }
-	float transmittance = exp(-totalDensity);
-	 result = result * transmittance + totalDensity*_slider;
+	
 	// Debug
 //	localPos = GetLocPos(currentPos);
-//	vec4 currentColor = vec4(texture(_CloudTexture,localPos).a);
-////	vec4 currentColor = texture(_cloud,localPos);
-//	result += currentColor;
-
+//	vec4 currentColor = vec4(texture(_CloudTexture,localPos+vec3(0,0,_slider)));
 //	result = currentColor;
 }
 

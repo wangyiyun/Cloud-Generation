@@ -36,9 +36,9 @@ GLuint quad_vbo = -1;
 GLuint quad_texture = -1;  // Texture rendered into
 GLuint cloud_texture = -1;  // Texture rendered into
 
-//names of the mesh and texture files to load
-static const std::string mesh_name = "Amago0.obj";
-static const std::string texture_name = "AmagoT.bmp";
+////names of the mesh and texture files to load
+//static const std::string mesh_name = "Amago0.obj";
+//static const std::string texture_name = "AmagoT.bmp";
 
 //some trackball variables -> used in mouse feedback
 TrackBallC trackball;
@@ -46,14 +46,14 @@ bool mouseLeft, mouseMid, mouseRight;
 
 const float  PI = 3.141592f;
 
-MeshData mesh_data;
+//MeshData mesh_data;
 float time_sec = 0.0f;
 float viewAngle = -PI;
 float _camPos[3] = { 0.0,0.0,-1.1 };
 bool recording = false;
 
 // slider
-float _slider = 1.0f;
+float _slider = 0.0f;
 
 // ray marching box info
 float _boxScale[3] = {0.5,0.5,0.5};
@@ -69,36 +69,36 @@ void draw_gui()
 {
    ImGui_ImplGlut_NewFrame();
 
-   const int filename_len = 256;
-   static char video_filename[filename_len] = "capture.mp4";
+   //const int filename_len = 256;
+   //static char video_filename[filename_len] = "capture.mp4";
 
-   ImGui::InputText("Video filename", video_filename, filename_len);
-   ImGui::SameLine();
-   if (recording == false)
-   {
-      if (ImGui::Button("Start Recording"))
-      {
-         const int w = glutGet(GLUT_WINDOW_WIDTH);
-         const int h = glutGet(GLUT_WINDOW_HEIGHT);
-         recording = true;
-         start_encoding(video_filename, w, h); //Uses ffmpeg
-      }
-      
-   }
-   else
-   {
-      if (ImGui::Button("Stop Recording"))
-      {
-         recording = false;
-         finish_encoding(); //Uses ffmpeg
-      }
-   }
+   //ImGui::InputText("Video filename", video_filename, filename_len);
+   //ImGui::SameLine();
+   //if (recording == false)
+   //{
+   //   if (ImGui::Button("Start Recording"))
+   //   {
+   //      const int w = glutGet(GLUT_WINDOW_WIDTH);
+   //      const int h = glutGet(GLUT_WINDOW_HEIGHT);
+   //      recording = true;
+   //      start_encoding(video_filename, w, h); //Uses ffmpeg
+   //   }
+   //   
+   //}
+   //else
+   //{
+   //   if (ImGui::Button("Stop Recording"))
+   //   {
+   //      recording = false;
+   //      finish_encoding(); //Uses ffmpeg
+   //   }
+   //}
 
    //ImGui::SliderFloat3("Cam Pos", _camPos, -1.0f, 1.0f);
    ImGui::SliderFloat("View angle", &viewAngle, -PI, +PI);
-   ImGui::SliderFloat3("Box Scale", _boxScale, 0.1f, 2.0f);
+   //ImGui::SliderFloat3("Box Scale", _boxScale, 0.1f, 2.0f);
    ImGui::SliderFloat3("Box Pos", _boxPos, -1.0f, 1.0f);
-   ImGui::SliderFloat("Slider", &_slider, 1.0f, 2.0f);
+   ImGui::SliderFloat("Slider", &_slider, 0.0f, 1.0f);
 
    //ImGui::Image((void*)texture_id, ImVec2(128,128));
    if (ImGui::Button("Reset Scene"))
@@ -281,11 +281,11 @@ void initOpenGl()
 	reload_shader();
 
 	//Load a mesh and a texture
-	mesh_data = LoadMesh(mesh_name); //Helper function: Uses Open Asset Import library.
-	texture_id = LoadTexture(texture_name.c_str()); //Helper function: Uses FreeImage library
+	//mesh_data = LoadMesh(mesh_name); //Helper function: Uses Open Asset Import library.
+	//texture_id = LoadTexture(texture_name.c_str()); //Helper function: Uses FreeImage library
 
 	// Generate noise texture in compute shader
-	// do something...
+	// do something...£¿
 
 	// Generate quad
 	glGenVertexArrays(1, &quad_vao);
