@@ -31,8 +31,6 @@ GLuint texture_id = -1; //Texture map for fish
 GLuint quad_vao = -1;
 GLuint quad_vbo = -1;
 
-//GLuint fbo_id = -1;       // Framebuffer object
-
 GLuint quad_texture = -1;  // Texture rendered into
 GLuint cloud_texture = -1;  // Texture rendered into
 
@@ -49,7 +47,7 @@ const float  PI = 3.141592f;
 //MeshData mesh_data;
 float time_sec = 0.0f;
 float viewAngle = -PI;
-float _camPos[3] = { 0.0,0.0,-1.1 };
+float height = 0.0f;
 bool recording = false;
 
 // slider
@@ -62,7 +60,6 @@ float _boxPos[3] = {0.0,0.0,0.0};
 // funcs
 void reload_shader();
 void reset_scene();
-bool check_framebuffer_status();
 
 //Draw the user interface using ImGui
 void draw_gui()
@@ -94,9 +91,9 @@ void draw_gui()
    //   }
    //}
 
-   //ImGui::SliderFloat3("Cam Pos", _camPos, -1.0f, 1.0f);
+   ImGui::SliderFloat("Cam height", &height, -2.0f, 2.0f);
    ImGui::SliderFloat("View angle", &viewAngle, -PI, +PI);
-   //ImGui::SliderFloat3("Box Scale", _boxScale, 0.1f, 2.0f);
+   ImGui::SliderFloat3("Box Scale", _boxScale, 0.1f, 2.0f);
    ImGui::SliderFloat3("Box Pos", _boxPos, -1.0f, 1.0f);
    ImGui::SliderFloat("Slider", &_slider, 0.0f, 1.0f);
 
@@ -144,16 +141,17 @@ void display()
 	const float radius = 1.0f;
 	float camX = sin(viewAngle) * radius;
 	float camZ = cos(viewAngle) * radius;
-	glm::mat4 view;
-	view = glm::lookAt(glm::vec3(camX, 0.0, camZ), glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0));
+	// lookAt eye(right), center, up
+	glm::mat4 V = glm::lookAt(glm::vec3(camX, 0.0, camZ), glm::vec3(0, -height, 0), glm::vec3(0.0, 1.0, 0.0));;
+	
 
-	glm::mat4 P = glm::perspective(80.0f, aspect_ratio, 0.1f, 100.0f);
+	glm::mat4 P = glm::perspective(45.0f, aspect_ratio, 0.1f, 100.0f);
 
 	const int size_loc = 1;	// "windowSize"
 	glUniform2f(size_loc, w, h);
 
 	const int V_loc = 2;	//"_CameraToWorld"
-	glUniformMatrix4fv(V_loc, 1, false, glm::value_ptr(view));
+	glUniformMatrix4fv(V_loc, 1, false, glm::value_ptr(V));
 
 	const int IP_loc = 3;	//"_CameraInverseProjection"
 	glm::mat4 IP = glm::inverse(P);
@@ -202,16 +200,14 @@ void idle()
 void reset_scene()
 {
 	viewAngle = -PI;
-	_camPos[0] = 0.0f;
-	_camPos[1] = 0.0f;
-	_camPos[2] = -1.1f;
+	height = 0.0f;
 	_boxScale[0] = 0.5f;
 	_boxScale[1] = 0.5f;
 	_boxScale[2] = 0.5f;
 	_boxPos[0] = 0.0f;
 	_boxPos[1] = 0.0f;
 	_boxPos[2] = 0.0f;
-	_slider = 1.0f;
+	_slider = 0.0f;
 }
 
 void reload_shader()
@@ -242,33 +238,6 @@ void printGlInfo()
 	std::cout << "Renderer: "     << glGetString(GL_RENDERER)                  << std::endl;
 	std::cout << "Version: "      << glGetString(GL_VERSION)                   << std::endl;
 	std::cout << "GLSL Version: " << glGetString(GL_SHADING_LANGUAGE_VERSION)  << std::endl;
-}
-
-bool check_framebuffer_status()
-{
-	GLenum status;
-	status = (GLenum)glCheckFramebufferStatus(GL_FRAMEBUFFER);
-	switch (status) {
-	case GL_FRAMEBUFFER_COMPLETE:
-		printf("Framebuffer complete.\n");
-		return true;
-	case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT:
-		printf("Framebuffer incomplete, incomplete attachment\n");
-		return false;
-	case GL_FRAMEBUFFER_UNSUPPORTED:
-		printf("Unsupported framebuffer format\n");
-		return false;
-	case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT:
-		printf("Framebuffer incomplete, missing attachment\n");
-		return false;
-	case GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER:
-		printf("Framebuffer incomplete, missing draw buffer\n");
-		return false;
-	case GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER:
-		printf("Framebuffer incomplete, missing read buffer\n");
-		return false;
-	}
-	return false;
 }
 
 void initOpenGl()
@@ -314,18 +283,6 @@ void initOpenGl()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glBindTexture(GL_TEXTURE_2D, 0);
-
-	////Create the framebuffer object
-	//glGenFramebuffers(1, &fbo_id);
-	//glBindFramebuffer(GL_FRAMEBUFFER, fbo_id);
-	//glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, quad_texture, 0);
-
-	//glDrawBuffer(fbo_id);
-
-	/*check_framebuffer_status();
-
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);*/
-
 }
 
 // glut callbacks need to send keyboard and mouse events to imgui
@@ -410,7 +367,7 @@ void mouse(int button, int state, int x, int y)
 void GenNoiseTexture()
 {
 	NoiseGen noiseMaster;
-	noiseMaster.GenCloudTexture(cloud_texture);
+	noiseMaster.GetNoiseTexture(cloud_texture);
 	//cout << cloud_texture << endl;
 	glUseProgram(shader_program);
 	glActiveTexture(GL_TEXTURE0);

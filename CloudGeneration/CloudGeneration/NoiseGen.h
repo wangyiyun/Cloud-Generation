@@ -16,8 +16,9 @@ class NoiseGen
 {
 public:
 	NoiseGen();
-	void GenCloudTexture(GLuint &cloud_texture);
+	void GetNoiseTexture(GLuint &cloud_texture);
 private:
+	void GenNoiseTexture(GLuint& cloud_texture);
 	float GetPerlinValue(vec3 texPos, int freq);
 	float GetWorleyVaule(vec3 texPos, int freq);
 	void GenWorleyGrid();

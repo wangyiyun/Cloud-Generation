@@ -12,7 +12,7 @@ out vec4 fragcolor;
 in vec2 tex_coord;
 
 vec2 uv;	// current pixel pos on screen
-const int RAY_MARCHING_STEPS = 64;
+const int RAY_MARCHING_STEPS = 32;
 const float INF = 9999;
 const float EPSILON = 0.0001;
 const float PI = 3.1415926;
@@ -65,14 +65,6 @@ Ray CreateCameraRay(vec2 uv)
     return CreateRay(origin, direction);
 }
 
-vec4 AlphaBlend(vec4 a, vec4 b)
-{
-	vec4 result = a;
-	result.xyz = a.xyz * (1 - b.w) + b.xyz * b.w;
-	result.w = 1;
-	return result;
-}
-
 struct Box
 {
 	vec3 position;
@@ -120,36 +112,30 @@ void IntersectBox(Ray ray, inout RayHit bestHit, Box box)
 vec3 GetLocPos(vec3 pos)
 {
 	return ((pos -_box.position)/_box.scale+1)*0.5;
-//	return pos * _boxScale + _slider;
 }
-
-//float SphereDistance(vec3 eye, vec3 centre, float radius) {
-//    return distance(eye, centre) - radius;
-//}
-//
-//float CubeDistance(vec3 eye, vec3 centre, vec3 scale) {
-//    vec3 o = abs(eye - centre) - scale;
-//    float ud = length(max(o,0));
-//    float n = max(max(min(o.x,0),min(o.y,0)), min(o.z,0));
-//    return ud+n;
-//}
-//
-//float distanceField(vec3 p)
-//{
-//	float cubeDist = CubeDistance(p, _boxPosition, _boxScale);
-////	float sphereDist = SphereDistance(p, vec3(0), _slider);
-//	return cubeDist;
-//}
 
 vec3 Remap(vec3 p)
 {
 	return (p-_boxPosition)/(_boxScale*2) + vec3(0.5);
 }
 
+float Remap(float v, float l0, float h0, float ln, float hn)
+{
+	return ln + ((v - l0) * (hn - ln)) / (h0 - l0);
+}
+
 vec4 GetSkyColor(float y)
 {
 	 y = y*0.5 + 0.5;
-	return mix(vec4(0.5,0.3,0.5,1.0),skyColor,y);
+	return mix(skyColor,vec4(0.7,0.5,0.8,1.0),y);
+}
+
+float SampleDensity(vec3 p)
+{
+	if(p.x < 0 ||p.y<0||p.z<0||p.x> 1||p.y>1||p.z>1) return 0;
+	vec4 cloudShape =  texture(_CloudTexture, p);
+//	return Remap(cloudShape.r,( cloudShape.g * 0.625 + cloudShape.b * 0.25 + cloudShape.a * 0.125)-1, 1, 0, 1);
+	return mix(cloudShape.r, cloudShape.b, cloudShape.a);
 }
 
 vec3 sunPos = vec3(5,5,5);
@@ -157,20 +143,14 @@ float lightMarch(vec3 p)
 {
 	float light = 0; 
 	vec3 lightDir = normalize(sunPos - p);
-	float stepSize = distance(sunPos, p) / 4.0;
+	float stepSize = distance(sunPos, p)/4.0;
 	for(int i = 0; i < 4; i++)
 	{
-		float density = texture(_CloudTexture, GetLocPos(p)).r;
-		if(density > _slider) light += exp(-i*stepSize);
+		float opacity = SampleDensity(GetLocPos(p));
+		if(opacity > _slider) light += exp(-i*stepSize);
 		p += lightDir*stepSize;
 	}
 	return light;
-}
-
-float SampleDensity(vec3 p, float len)
-{
-	vec4 cloudShape =  texture(_CloudTexture, p);
-	return cloudShape.r * exp(-len);
 }
 
 void Volume(Ray ray, RayHit hit, inout vec4 result)
@@ -184,25 +164,21 @@ void Volume(Ray ray, RayHit hit, inout vec4 result)
 	vec3 eachStep =  stepSize * normalize(end - start);
 	vec3 currentPos = start;
 
-	 // https://www.youtube.com/watch?v=4QOcCGI6xOU
 	 // exp for lighting
 	vec3 localPos;
+
 	vec3 lightColor = vec3(0.7);
 	vec3 cloudColor = vec3(1);
 	float totalDensity = 0;
-	result.w = 0;
 	 for(int i = 0; i < RAY_MARCHING_STEPS; i++)
 	 {
 	 	localPos = GetLocPos(currentPos);
+	 	// fix this blend part!
+		float opacity = SampleDensity(localPos);
+		vec4 noise = texture(_CloudTexture, localPos);
+		if(noise.r*noise.g > _slider) result.xyz = result.xyz * (1 - opacity) + cloudColor * opacity;
+		currentPos += eachStep;
 	 	
-		float opacity = SampleDensity(localPos, i*stepSize);
-		if(opacity > _slider)
-		{
-			result.xyz = result.xyz * (1 - opacity) + cloudColor * opacity;
-			result.w += opacity;
-		}
-		if(result.w >= 1) break;
-	 	currentPos += eachStep;
 	 }
 	
 	// Debug
