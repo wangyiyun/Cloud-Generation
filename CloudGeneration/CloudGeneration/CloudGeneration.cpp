@@ -51,7 +51,7 @@ float height = 0.0f;
 bool recording = false;
 
 // slider
-float _slider = 0.0f;
+float _slider[4] = { 0.0, 0.0,0.0,0.0 };
 
 // ray marching box info
 float _boxScale[3] = {0.5,0.5,0.5};
@@ -95,7 +95,7 @@ void draw_gui()
    ImGui::SliderFloat("View angle", &viewAngle, -PI, +PI);
    ImGui::SliderFloat3("Box Scale", _boxScale, 0.1f, 2.0f);
    ImGui::SliderFloat3("Box Pos", _boxPos, -1.0f, 1.0f);
-   ImGui::SliderFloat("Slider", &_slider, 0.0f, 1.0f);
+   ImGui::SliderFloat4("Slider", _slider, 0.0f, 1.0f);
 
    //ImGui::Image((void*)texture_id, ImVec2(128,128));
    if (ImGui::Button("Reset Scene"))
@@ -164,7 +164,7 @@ void display()
 	glUniform3f(box_pos_loc, _boxPos[0], _boxPos[1], _boxPos[2]);
 
 	const int slider_loc = 6;	// "_slider"
-	glUniform1f(slider_loc, _slider);
+	glUniform4f(slider_loc, _slider[0], _slider[1], _slider[2], _slider[3]);
 
 	glBindVertexArray(quad_vao);
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -207,7 +207,6 @@ void reset_scene()
 	_boxPos[0] = 0.0f;
 	_boxPos[1] = 0.0f;
 	_boxPos[2] = 0.0f;
-	_slider = 0.0f;
 }
 
 void reload_shader()

@@ -5,14 +5,14 @@ layout(location = 2) uniform mat4 _CameraToWorld;
 layout(location = 3) uniform mat4 _CameraInverseProjection;
 layout(location = 4) uniform vec3 _boxScale;
 layout(location = 5) uniform vec3 _boxPosition;
-layout(location = 6) uniform float _slider;
+layout(location = 6) uniform vec4 _slider;
 layout(location = 7) uniform sampler3D _CloudTexture;
 
 out vec4 fragcolor;           
 in vec2 tex_coord;
 
 vec2 uv;	// current pixel pos on screen
-const int RAY_MARCHING_STEPS = 32;
+const int RAY_MARCHING_STEPS = 64;
 const float INF = 9999;
 const float EPSILON = 0.0001;
 const float PI = 3.1415926;
@@ -109,19 +109,22 @@ void IntersectBox(Ray ray, inout RayHit bestHit, Box box)
 	}
 }
 
-vec3 GetLocPos(vec3 pos)
-{
-	return ((pos -_box.position)/_box.scale+1)*0.5;
-}
-
-vec3 Remap(vec3 p)
-{
-	return (p-_boxPosition)/(_boxScale*2) + vec3(0.5);
-}
-
 float Remap(float v, float l0, float h0, float ln, float hn)
 {
 	return ln + ((v - l0) * (hn - ln)) / (h0 - l0);
+}
+
+float SAT(float v)
+{
+	if(v > 1) return 1;
+	if(v < 0) return 0;
+	return v;
+}
+
+// need new pos calculation
+vec3 GetLocPos(vec3 pos)
+{
+	return ((pos -_box.position)/(_box.scale)+1)*0.5;
 }
 
 vec4 GetSkyColor(float y)
@@ -131,60 +134,89 @@ vec4 GetSkyColor(float y)
 }
 
 float SampleDensity(vec3 p)
-{
-	if(p.x < 0 ||p.y<0||p.z<0||p.x> 1||p.y>1||p.z>1) return 0;
-	vec4 cloudShape =  texture(_CloudTexture, p);
-//	return Remap(cloudShape.r,( cloudShape.g * 0.625 + cloudShape.b * 0.25 + cloudShape.a * 0.125)-1, 1, 0, 1);
-	return mix(cloudShape.r, cloudShape.b, cloudShape.a);
+{	
+	// p is world pos
+	vec3 uvw = GetLocPos(p);
+	vec4 cloudShape =  texture(_CloudTexture, uvw);
+	
+	// calculate base shape density
+	// Refer: Sebastian Lague @ Code Adventure
+	float boxBottom = _box.position.y - _box.scale.y;
+	float heightPercent = (p.y - boxBottom) / (_box.scale.y);
+	float heightGradient = SAT(Remap(heightPercent, 0.0, 0.2,0,1)) * SAT(Remap(heightPercent, 1, 0.7, 0,1));
+	float shapeFBM = (cloudShape.r*_slider.x + cloudShape.g*_slider.y + cloudShape.b*_slider.z + cloudShape.a*_slider.w)* heightGradient;
+	
+	if(shapeFBM > 0)
+	{
+		float density = max(0, shapeFBM - 0.5)*1.2*50;
+		return density;
+	}
+
+	return 0;
 }
 
-vec3 sunPos = vec3(5,5,5);
+vec3 sunDir = vec3(0,1,0);
+const int LIGHT_MARCH_NUM = 10;
 float lightMarch(vec3 p)
 {
-	float light = 0; 
-	vec3 lightDir = normalize(sunPos - p);
-	float stepSize = distance(sunPos, p)/4.0;
-	for(int i = 0; i < 4; i++)
+	float totalDensity = 0; 
+	vec3 lightDir = normalize(sunDir);
+	Ray lightRay = CreateRay(p, lightDir);
+	RayHit lightHit = CreateRayHit();
+	IntersectBox(lightRay, lightHit,_box);
+
+	float distInBox = abs(lightHit.exitPoint - lightHit.entryPoint);
+
+//	return distInBox;
+
+	float stepSize = distInBox / float(LIGHT_MARCH_NUM);
+	for(int i = 0; i < LIGHT_MARCH_NUM; i++)
 	{
-		float opacity = SampleDensity(GetLocPos(p));
-		if(opacity > _slider) light += exp(-i*stepSize);
 		p += lightDir*stepSize;
+		totalDensity += max(0.0, SampleDensity(p)*stepSize);
 	}
-	return light;
+	float transmittance = exp(-totalDensity*1.5);
+	float darknessThreshold = 0.7;
+	return darknessThreshold + transmittance*(1-darknessThreshold);
 }
+
+vec3 lightColor = vec3(0.9);
 
 void Volume(Ray ray, RayHit hit, inout vec4 result)
 {
 	vec3 start = hit.position;
-	vec3 end = hit.position + ray.direction*(hit.exitPoint-hit.entryPoint);
+	vec3 end = hit.position + ray.direction*abs(hit.exitPoint-hit.entryPoint);
 	float len = distance(start,end);
 	float stepSize = len / float(RAY_MARCHING_STEPS);
-//	int num = int(len/stepSize);
 
 	vec3 eachStep =  stepSize * normalize(end - start);
 	vec3 currentPos = start;
 
 	 // exp for lighting
-	vec3 localPos;
-
-	vec3 lightColor = vec3(0.7);
-	vec3 cloudColor = vec3(1);
-	float totalDensity = 0;
+	vec3 lightEnergy = vec3(0.0);
+	float transmittance = 1;
 	 for(int i = 0; i < RAY_MARCHING_STEPS; i++)
 	 {
-	 	localPos = GetLocPos(currentPos);
-	 	// fix this blend part!
-		float opacity = SampleDensity(localPos);
-		vec4 noise = texture(_CloudTexture, localPos);
-		if(noise.r*noise.g > _slider) result.xyz = result.xyz * (1 - opacity) + cloudColor * opacity;
-		currentPos += eachStep;
-	 	
+		float density = SampleDensity(currentPos);
+		if(density > 0)
+		{
+			float lightTransmittance = lightMarch(currentPos);
+			lightEnergy += density*stepSize*transmittance*lightTransmittance;
+			transmittance *= exp(-density*stepSize);
+
+			if(transmittance < 0.01)
+			{
+				break;
+			}
+//			result.xyz = vec3(density);
+//			break;
+
+		}
+		currentPos += eachStep;	 	
 	 }
-	
-	// Debug
-//	localPos = GetLocPos(currentPos);
-//	vec4 currentColor = vec4(texture(_CloudTexture,localPos+vec3(0,0,_slider)));
-//	result = currentColor;
+
+	 vec3 cloudColor = lightEnergy * lightColor;
+	 result.xyz = result.xyz*transmittance + cloudColor;
 }
 
 RayHit CastRay(Ray ray)
