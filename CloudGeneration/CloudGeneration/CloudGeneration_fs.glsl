@@ -6,7 +6,8 @@ layout(location = 3) uniform mat4 _CameraInverseProjection;
 layout(location = 4) uniform vec3 _boxScale;
 layout(location = 5) uniform vec3 _boxPosition;
 layout(location = 6) uniform vec4 _slider;
-layout(location = 7) uniform sampler3D _CloudTexture;
+layout(location = 7) uniform sampler3D _CloudShape;
+layout(location = 8) uniform sampler3D _CloudDetail;
 
 out vec4 fragcolor;           
 in vec2 tex_coord;
@@ -137,7 +138,7 @@ float SampleDensity(vec3 p)
 {	
 	// p is world pos
 	vec3 uvw = GetLocPos(p);
-	vec4 cloudShape =  texture(_CloudTexture, uvw);
+	vec4 cloudShape =  texture(_CloudShape, uvw);
 	
 	// calculate base shape density
 	// Refer: Sebastian Lague @ Code Adventure
@@ -192,6 +193,10 @@ void Volume(Ray ray, RayHit hit, inout vec4 result)
 	vec3 eachStep =  stepSize * normalize(end - start);
 	vec3 currentPos = start;
 
+//	// debug
+//	vec4 density = texture(_CloudDetail, GetLocPos(currentPos));
+//	result.xyz = vec3(density.z);
+
 	 // exp for lighting
 	vec3 lightEnergy = vec3(0.0);
 	float transmittance = 1;
@@ -208,8 +213,6 @@ void Volume(Ray ray, RayHit hit, inout vec4 result)
 			{
 				break;
 			}
-//			result.xyz = vec3(density);
-//			break;
 
 		}
 		currentPos += eachStep;	 	
@@ -217,6 +220,7 @@ void Volume(Ray ray, RayHit hit, inout vec4 result)
 
 	 vec3 cloudColor = lightEnergy * lightColor;
 	 result.xyz = result.xyz*transmittance + cloudColor;
+
 }
 
 RayHit CastRay(Ray ray)

@@ -32,7 +32,8 @@ GLuint quad_vao = -1;
 GLuint quad_vbo = -1;
 
 GLuint quad_texture = -1;  // Texture rendered into
-GLuint cloud_texture = -1;  // Texture rendered into
+GLuint cloud_shape = -1;  // Texture rendered into
+GLuint cloud_detail = -1;  // Texture rendered into
 
 ////names of the mesh and texture files to load
 //static const std::string mesh_name = "Amago0.obj";
@@ -123,13 +124,13 @@ void display()
 	const int h = glutGet(GLUT_WINDOW_HEIGHT);
 	const float aspect_ratio = float(w) / float(h);
 
-	//Make the viewport match the FBO texture size.
+	//Make the viewport match the screeb texture size.
 	int tex_w, tex_h;
 	glBindTexture(GL_TEXTURE_2D, quad_texture);
 	glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &tex_w);
 	glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &tex_h);
 
-	//Clear the FBO.
+	//Clear the screen.
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	//set camera
@@ -273,7 +274,7 @@ void initOpenGl()
 	const int w = glutGet(GLUT_SCREEN_WIDTH);
 	const int h = glutGet(GLUT_SCREEN_HEIGHT);
 
-	// Create FBO texture
+	// Create screen texture
 	glGenTextures(1, &quad_texture);
 	glBindTexture(GL_TEXTURE_2D, quad_texture);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE, 0);
@@ -366,13 +367,21 @@ void mouse(int button, int state, int x, int y)
 void GenNoiseTexture()
 {
 	NoiseGen noiseMaster;
-	noiseMaster.GetNoiseTexture(cloud_texture);
-	//cout << cloud_texture << endl;
+	noiseMaster.GetNoiseTexture(cloud_shape, cloud_detail);
+	//cout << cloud_shape << endl;
+	//cout << cloud_detail << endl;
 	glUseProgram(shader_program);
+	
+	
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_3D, cloud_texture);
-	const int tex_loc = 7;		// "_CloudTexture"
-	glUniform1i(tex_loc, 0);
+	glBindTexture(GL_TEXTURE_3D, cloud_shape);
+	const int tex_shape_loc = 7;		// "_CloudShape"
+	glUniform1i(tex_shape_loc, 0);
+
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_3D, cloud_detail);
+	const int tex_detail_loc = 8;		// "_CloudDetail"
+	glUniform1i(tex_detail_loc, 1);
 	glUseProgram(0);
 }
 

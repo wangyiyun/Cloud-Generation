@@ -4,17 +4,18 @@
 using namespace std;
 
 const int N = 128;
-vec4 cloud[N * N * N];
+vec4 shapeData[N * N * N];
+
+const int M = 32;
+vec4 detailData[M * M * M];
 
 const int W_l = 8;
-const int W_m = 16;
-const int W_h = 24;
-const int W_hst = 32;
+const int W_m = 12;
+const int W_h = 16;
 
 vec3 Worely_low[W_l * W_l * W_l];
 vec3 Worely_mid[W_m * W_m * W_m];
 vec3 Worely_high[W_h * W_h * W_h];
-vec3 Worely_highest[W_hst * W_hst * W_hst];
 
 NoiseGen::NoiseGen()
 {
@@ -39,19 +40,19 @@ float Remap(float v, float l0, float h0, float ln, float hn)
 
 //assuming that the data at hand is a 256x256x256 unsigned byte data
 //int XDIM = 32, YDIM = 32, ZDIM = 32;
-const int dataSize = N * N * N;
-bool LoadVolumeFromFile(const char* fileName, GLuint& cloud_texture) {
+bool LoadVolumeFromFile(const char* fileName, GLuint& tex, int dataSizeX, int dataSizeY, int dataSizeZ) {
 	FILE* pFile = fopen(fileName, "rb");
 	if (NULL == pFile) {
 		return false;
 	}
+	int dataSize = dataSizeX * dataSizeY * dataSizeZ;
 	glm::vec4 * pVolume = new glm::vec4[dataSize];
 	fread(pVolume, sizeof(glm::vec4), dataSize, pFile);
 	fclose(pFile);
 
 	//load data into a 3D texture
-	glGenTextures(1, &cloud_texture);
-	glBindTexture(GL_TEXTURE_3D, cloud_texture);
+	glGenTextures(1, &tex);
+	glBindTexture(GL_TEXTURE_3D, tex);
 
 	// set the texture parameters
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP);
@@ -60,24 +61,31 @@ bool LoadVolumeFromFile(const char* fileName, GLuint& cloud_texture) {
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
-	glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA8, N, N, N, 0, GL_RGBA, GL_FLOAT, pVolume);
+	glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA8, dataSizeX, dataSizeY, dataSizeZ, 0, GL_RGBA, GL_FLOAT, pVolume);
 
 	delete[] pVolume;
 	return true;
 }
 
-bool WriteVolumeToFile(const char* fileName)
+bool WriteVolumeToFile(const char* fileName, vec4 *data, int dataSizeX, int dataSizeY, int dataSizeZ)
 {
 	FILE* pFile = fopen(fileName, "wb");
 	if (NULL == pFile) {
 		return false;
 	}
-	fwrite(cloud, sizeof(glm::vec4), dataSize, pFile);
+	int dataSize = dataSizeX * dataSizeY * dataSizeZ;
+	fwrite(data, sizeof(glm::vec4), dataSize, pFile);
 	fclose(pFile);
 }
 
 void NoiseGen::GenWorleyGrid()
 {
+	// init
+	srand(glutGet(GLUT_ELAPSED_TIME));
+	memset(Worely_low, 0, sizeof(Worely_low));
+	memset(Worely_mid, 0, sizeof(Worely_mid));
+	memset(Worely_high, 0, sizeof(Worely_high));
+
 	// For the Grid
 	// between (0,1)
 	for (int x = 0; x < W_l; x++)
@@ -121,26 +129,10 @@ void NoiseGen::GenWorleyGrid()
 		}
 	}
 	std::cout << "INFO: Generated high freq Worley Grid." << endl;
-
-	for (int x = 0; x < W_hst; x++)
-	{
-		for (int y = 0; y < W_hst; y++)
-		{
-			for (int z = 0; z < W_hst; z++)
-			{
-				Worely_highest[x * W_hst * W_hst + y * W_hst + z] = vec3(x + GetRandom(),
-													y + GetRandom(),
-													z + GetRandom())/(float)W_hst;
-			}
-		}
-	}
-	std::cout << "INFO: Generated highest freq Worley Grid." << endl;
 }
 
-void NoiseGen::GenNoiseTexture(GLuint &cloud_texture)
+void NoiseGen::GenGloudShape(GLuint &cloud_shape)
 {
-	// init
-	srand(glutGet(GLUT_ELAPSED_TIME));
 	GenWorleyGrid();
 	std::cout << "INFO: Texture generating, stay tuned..." << std::endl;
 
@@ -156,6 +148,7 @@ void NoiseGen::GenNoiseTexture(GLuint &cloud_texture)
 
 				//Low freq Perlin-Worley
 				R = (GetPerlinValue(pos, W_l));
+
 				//Medium freq Worley
 				G = GetWorleyVaule(pos, W_l);
 
@@ -165,26 +158,14 @@ void NoiseGen::GenNoiseTexture(GLuint &cloud_texture)
 				//Higest freq Worly
 				A = GetWorleyVaule(pos, W_h);
 
-				cloud[x * N * N + y * N + z] = vec4(R,G,B,A);
-
-				// Debug
-				//if (distance(vec3(x, y, z), vec3(N/2, N/2, N/2)) < N/2)
-				//{
-				//	//cout << distance(vec3(x, y, z), vec3(0, 0, 0)) << endl;
-				//	cloud[x * N * N + y * N + z] = vec4(1,1,1,GetRandom());
-				//}
-				//else cloud[x * N * N + y * N + z] = vec4(0);
-
-				/*cout << cloud[x * N * N + y * N + z].x <<
-					cloud[x * N * N + y * N + z].y <<
-					cloud[x * N * N + y * N + z].z <<
-					cloud[x * N * N + y * N + z].w << endl;*/
+				shapeData[x * N * N + y * N + z] = vec4(R,G,B,A);
 			}
 		}
 	}
-	glGenTextures(1, &cloud_texture);
-	glBindTexture(GL_TEXTURE_3D, cloud_texture);
-	glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA8, N, N, N, 0, GL_RGBA, GL_FLOAT, cloud);
+	glActiveTexture(GL_TEXTURE0);
+	glGenTextures(1, &cloud_shape);
+	glBindTexture(GL_TEXTURE_3D, cloud_shape);
+	glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA8, N, N, N, 0, GL_RGBA, GL_FLOAT, shapeData);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -192,9 +173,53 @@ void NoiseGen::GenNoiseTexture(GLuint &cloud_texture)
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 	glBindTexture(GL_TEXTURE_3D, 0);
 
-	WriteVolumeToFile("noiseDataTest.raw");
+	WriteVolumeToFile("CloudShapeData.raw", shapeData, N, N, N);
 
-	std::cout << "INFO: Texture Generated!" << std::endl;
+	std::cout << "INFO: Cloud shape texture Generated!" << std::endl;
+}
+
+void NoiseGen::GenGloudDetail(GLuint& cloud_detail)
+{
+	GenWorleyGrid();
+
+	for (int x = 0; x < M; x++)
+	{
+		for (int y = 0; y < M; y++)
+		{
+			for (int z = 0; z < M; z++)
+			{
+				float R, G, B;
+				// coord (0,1) fo 3D tex
+				vec3 pos = vec3(x, y, z) / float(M);
+
+				//Low freq Perlin-Worley
+				R = GetWorleyVaule(pos, W_l);
+				
+				//Medium freq Worley
+				G = GetWorleyVaule(pos, W_m);
+				
+				//High freq Worley
+				B = GetWorleyVaule(pos, W_h);
+
+				detailData[x * M * M + y * M + z] = vec4(R, G, B, 0);
+			}
+		}
+	}
+	glActiveTexture(GL_TEXTURE1);
+	glGenTextures(1, &cloud_detail);
+	glBindTexture(GL_TEXTURE_3D, cloud_detail);
+	glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA8, M, M, M, 0, GL_RGBA, GL_FLOAT, detailData);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+	glBindTexture(GL_TEXTURE_3D, 0);
+
+	WriteVolumeToFile("CloudDetailData.raw", detailData, M, M, M);
+
+	std::cout << "INFO: Cloud detail texture Generated!" << std::endl;
+
 }
 
 float NoiseGen::GetPerlinValue(vec3 texPos, int freq)
@@ -239,9 +264,6 @@ float NoiseGen::GetWorleyVaule(vec3 texPos, int freq)
 	case W_h:
 		p = Worely_high;
 		break;
-	case W_hst:
-		p = Worely_highest;
-		break;
 	default:
 		p = NULL;
 		std::cout << "ERROR: Send unknown freq in Worely Generation." << endl;
@@ -271,19 +293,29 @@ float NoiseGen::GetWorleyVaule(vec3 texPos, int freq)
 	float maxDist = (float)2 / freq;
 	result = Remap(result, 0, maxDist, 0, 1);
 	//cout << result << endl;
-	// Inverse? 1- result
+	// Inverse
 	return 1-result;
 }
 
-void NoiseGen::GetNoiseTexture(GLuint& cloud_texture)
+void NoiseGen::GetNoiseTexture(GLuint& cloud_shape, GLuint& cloud_detail)
 {
-	if (LoadVolumeFromFile("noiseDataTest.raw", cloud_texture))
+	if (LoadVolumeFromFile("CloudShapeData.raw", cloud_shape, N, N, N))
 	{
-		std::cout << "INFO: Texture exist!" << std::endl;
+		std::cout << "INFO: Cloud shape texture exist!" << std::endl;
 	}
 	else
 	{
-		GenNoiseTexture(cloud_texture);
+		GenGloudShape(cloud_shape);
 	}
+
+	if (LoadVolumeFromFile("CloudDetailData.raw", cloud_detail, M, M, M))
+	{
+		std::cout << "INFO: Cloud detail texture exist!" << std::endl;
+	}
+	else
+	{
+		GenGloudDetail(cloud_detail);
+	}
+	
 	return;
 }
