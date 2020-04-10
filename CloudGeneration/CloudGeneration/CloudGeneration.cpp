@@ -52,6 +52,7 @@ float height = 0.0f;
 bool recording = false;
 
 // slider
+float _FBM[4] = { 0.0, 0.0,0.0,0.0 };
 float _slider[4] = { 0.0, 0.0,0.0,0.0 };
 
 // ray marching box info
@@ -61,6 +62,7 @@ float _boxPos[3] = {0.0,0.0,0.0};
 // funcs
 void reload_shader();
 void reset_scene();
+void ReloadNoiseTexture();
 
 //Draw the user interface using ImGui
 void draw_gui()
@@ -96,6 +98,7 @@ void draw_gui()
    ImGui::SliderFloat("View angle", &viewAngle, -PI, +PI);
    ImGui::SliderFloat3("Box Scale", _boxScale, 0.1f, 2.0f);
    ImGui::SliderFloat3("Box Pos", _boxPos, -1.0f, 1.0f);
+   ImGui::SliderFloat4("FBM", _FBM, 0.0f, 1.0f);
    ImGui::SliderFloat4("Slider", _slider, 0.0f, 1.0f);
 
    //ImGui::Image((void*)texture_id, ImVec2(128,128));
@@ -164,7 +167,10 @@ void display()
 	const int box_pos_loc = 5;	// "_boxScale"
 	glUniform3f(box_pos_loc, _boxPos[0], _boxPos[1], _boxPos[2]);
 
-	const int slider_loc = 6;	// "_slider"
+	const int FBM_loc = 6;	// "_FBM"
+	glUniform4f(FBM_loc, _FBM[0], _FBM[1], _FBM[2], _FBM[3]);
+
+	const int slider_loc = 9;	// "_slider"
 	glUniform4f(slider_loc, _slider[0], _slider[1], _slider[2], _slider[3]);
 
 	glBindVertexArray(quad_vao);
@@ -229,6 +235,9 @@ void reload_shader()
 		shader_program = new_shader;
 
 	}
+
+	// send noise texture again
+	ReloadNoiseTexture();
 }
 
 // Display info about the OpenGL implementation provided by the graphics driver.
@@ -364,21 +373,35 @@ void mouse(int button, int state, int x, int y)
 	}
 }
 
-void GenNoiseTexture()
+void ReloadNoiseTexture()
 {
-	NoiseGen noiseMaster;
-	noiseMaster.GetNoiseTexture(cloud_shape, cloud_detail);
-	//cout << cloud_shape << endl;
-	//cout << cloud_detail << endl;
 	glUseProgram(shader_program);
-	
-	
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_3D, cloud_shape);
 	const int tex_shape_loc = 7;		// "_CloudShape"
 	glUniform1i(tex_shape_loc, 0);
 
 	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_3D, cloud_detail);
+	const int tex_detail_loc = 8;		// "_CloudDetail"
+	glUniform1i(tex_detail_loc, 1);
+	glUseProgram(0);
+}
+
+void GenNoiseTexture()
+{
+	NoiseGen noiseMaster;
+
+	glUseProgram(shader_program);
+	
+	glActiveTexture(GL_TEXTURE0);
+	noiseMaster.GetGloudShape(cloud_shape);
+	glBindTexture(GL_TEXTURE_3D, cloud_shape);
+	const int tex_shape_loc = 7;		// "_CloudShape"
+	glUniform1i(tex_shape_loc, 0);
+
+	glActiveTexture(GL_TEXTURE1);
+	noiseMaster.GetGloudDetail(cloud_detail);
 	glBindTexture(GL_TEXTURE_3D, cloud_detail);
 	const int tex_detail_loc = 8;		// "_CloudDetail"
 	glUniform1i(tex_detail_loc, 1);

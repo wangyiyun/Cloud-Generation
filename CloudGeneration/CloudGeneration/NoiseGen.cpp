@@ -131,8 +131,15 @@ void NoiseGen::GenWorleyGrid()
 	std::cout << "INFO: Generated high freq Worley Grid." << endl;
 }
 
-void NoiseGen::GenGloudShape(GLuint &cloud_shape)
+void NoiseGen::GetGloudShape(GLuint &cloud_shape)
 {
+
+	if (LoadVolumeFromFile("CloudShapeData.raw", cloud_shape, N, N, N))
+	{
+		std::cout << "INFO: Cloud shape texture exist!" << std::endl;
+		return;
+	}
+	
 	GenWorleyGrid();
 	std::cout << "INFO: Texture generating, stay tuned..." << std::endl;
 
@@ -178,8 +185,14 @@ void NoiseGen::GenGloudShape(GLuint &cloud_shape)
 	std::cout << "INFO: Cloud shape texture Generated!" << std::endl;
 }
 
-void NoiseGen::GenGloudDetail(GLuint& cloud_detail)
+void NoiseGen::GetGloudDetail(GLuint& cloud_detail)
 {
+	if (LoadVolumeFromFile("CloudDetailData.raw", cloud_detail, M, M, M))
+	{
+		std::cout << "INFO: Cloud detail texture exist!" << std::endl;
+		return;
+	}
+
 	GenWorleyGrid();
 
 	for (int x = 0; x < M; x++)
@@ -295,27 +308,4 @@ float NoiseGen::GetWorleyVaule(vec3 texPos, int freq)
 	//cout << result << endl;
 	// Inverse
 	return 1-result;
-}
-
-void NoiseGen::GetNoiseTexture(GLuint& cloud_shape, GLuint& cloud_detail)
-{
-	if (LoadVolumeFromFile("CloudShapeData.raw", cloud_shape, N, N, N))
-	{
-		std::cout << "INFO: Cloud shape texture exist!" << std::endl;
-	}
-	else
-	{
-		GenGloudShape(cloud_shape);
-	}
-
-	if (LoadVolumeFromFile("CloudDetailData.raw", cloud_detail, M, M, M))
-	{
-		std::cout << "INFO: Cloud detail texture exist!" << std::endl;
-	}
-	else
-	{
-		GenGloudDetail(cloud_detail);
-	}
-	
-	return;
 }

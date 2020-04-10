@@ -5,9 +5,10 @@ layout(location = 2) uniform mat4 _CameraToWorld;
 layout(location = 3) uniform mat4 _CameraInverseProjection;
 layout(location = 4) uniform vec3 _boxScale;
 layout(location = 5) uniform vec3 _boxPosition;
-layout(location = 6) uniform vec4 _slider;
+layout(location = 6) uniform vec4 _FBM;
 layout(location = 7) uniform sampler3D _CloudShape;
 layout(location = 8) uniform sampler3D _CloudDetail;
+layout(location = 9) uniform vec4 _slider;
 
 out vec4 fragcolor;           
 in vec2 tex_coord;
@@ -145,10 +146,13 @@ float SampleDensity(vec3 p)
 	float boxBottom = _box.position.y - _box.scale.y;
 	float heightPercent = (p.y - boxBottom) / (_box.scale.y);
 	float heightGradient = SAT(Remap(heightPercent, 0.0, 0.2,0,1)) * SAT(Remap(heightPercent, 1, 0.7, 0,1));
-	float shapeFBM = (cloudShape.r*_slider.x + cloudShape.g*_slider.y + cloudShape.b*_slider.z + cloudShape.a*_slider.w)* heightGradient;
+	float shapeFBM = (cloudShape.r*_FBM.x + cloudShape.g*_FBM.y + cloudShape.b*_FBM.z + cloudShape.a*_FBM.w)* heightGradient;
 	
-	if(shapeFBM > 0)
+	if(shapeFBM <= 0)
 	{
+
+		vec4 cloudDetail =  texture(_CloudDetail, uvw);
+		float detailFBM = (cloudDetail.r*_slider.x + cloudDetail.g*_slider.y + cloudDetail.b*_slider.z);
 		float density = max(0, shapeFBM - 0.5)*1.2*50;
 		return density;
 	}
@@ -193,33 +197,36 @@ void Volume(Ray ray, RayHit hit, inout vec4 result)
 	vec3 eachStep =  stepSize * normalize(end - start);
 	vec3 currentPos = start;
 
-//	// debug
-//	vec4 density = texture(_CloudDetail, GetLocPos(currentPos));
-//	result.xyz = vec3(density.z);
+	// debug
+	vec3 localPos = GetLocPos(currentPos) + vec3(0,0,_slider.y);
+	vec4 shape = texture(_CloudShape, localPos);
+	vec4 detail = texture(_CloudDetail, localPos);
+	if(localPos.y > _slider.x) result.xyz = vec3(shape.x);
+	else result.xyz = vec3(detail.x);
 
-	 // exp for lighting
-	vec3 lightEnergy = vec3(0.0);
-	float transmittance = 1;
-	 for(int i = 0; i < RAY_MARCHING_STEPS; i++)
-	 {
-		float density = SampleDensity(currentPos);
-		if(density > 0)
-		{
-			float lightTransmittance = lightMarch(currentPos);
-			lightEnergy += density*stepSize*transmittance*lightTransmittance;
-			transmittance *= exp(-density*stepSize);
-
-			if(transmittance < 0.01)
-			{
-				break;
-			}
-
-		}
-		currentPos += eachStep;	 	
-	 }
-
-	 vec3 cloudColor = lightEnergy * lightColor;
-	 result.xyz = result.xyz*transmittance + cloudColor;
+//	 // exp for lighting
+//	vec3 lightEnergy = vec3(0.0);
+//	float transmittance = 1;
+//	 for(int i = 0; i < RAY_MARCHING_STEPS; i++)
+//	 {
+//		float density = SampleDensity(currentPos);
+//		if(density > 0)
+//		{
+//			float lightTransmittance = lightMarch(currentPos);
+//			lightEnergy += density*stepSize*transmittance*lightTransmittance;
+//			transmittance *= exp(-density*stepSize);
+//
+//			if(transmittance < 0.01)
+//			{
+//				break;
+//			}
+//
+//		}
+//		currentPos += eachStep;	 	
+//	 }
+//
+//	 vec3 cloudColor = lightEnergy * lightColor;
+//	 result.xyz = result.xyz*transmittance + cloudColor;
 
 }
 
