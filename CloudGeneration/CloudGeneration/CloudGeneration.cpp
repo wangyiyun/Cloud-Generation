@@ -52,12 +52,14 @@ float height = 0.0f;
 bool recording = false;
 
 // slider
-float _FBM[4] = { 0.0, 0.0,0.0,0.0 };
-float _slider[4] = { 0.0, 0.0,0.0,0.0 };
+float _shape[4] = { 0.0, 0.0,0.0,0.0 };
+float _detail[3] = { 0.0, 0.0,0.0 };
 
 // ray marching box info
 float _boxScale[3] = {0.5,0.5,0.5};
 float _boxPos[3] = {0.0,0.0,0.0};
+
+float _offset[3] = {0.0,0.0,0.0};
 
 // funcs
 void reload_shader();
@@ -68,7 +70,6 @@ void ReloadNoiseTexture();
 void draw_gui()
 {
    ImGui_ImplGlut_NewFrame();
-
    //const int filename_len = 256;
    //static char video_filename[filename_len] = "capture.mp4";
 
@@ -93,23 +94,28 @@ void draw_gui()
    //      finish_encoding(); //Uses ffmpeg
    //   }
    //}
-
+   ImGui::Begin("Cloud Parameters");
    ImGui::SliderFloat("Cam height", &height, -2.0f, 2.0f);
-   ImGui::SliderFloat("View angle", &viewAngle, -PI, +PI);
+   //ImGui::SliderFloat("View angle", &viewAngle, -PI, +PI);
    ImGui::SliderFloat3("Box Scale", _boxScale, 0.1f, 2.0f);
    ImGui::SliderFloat3("Box Pos", _boxPos, -1.0f, 1.0f);
-   ImGui::SliderFloat4("FBM", _FBM, 0.0f, 1.0f);
-   ImGui::SliderFloat4("Slider", _slider, 0.0f, 1.0f);
+   ImGui::Text("Offset of the 4D sampling.");
+   ImGui::SliderFloat3("Offset", _offset, -1.0f, 1.0f);
+   ImGui::Text("Give the basic shape of the cloud.");
+   ImGui::SliderFloat4("Cloud Shape", _shape, 0.0f, 1.0f);
+   ImGui::Text("Please do NOT set all detail parameter to max value.");
+   ImGui::SliderFloat3("Cloud Detail", _detail, 0.0f, 1.0f);
 
-   //ImGui::Image((void*)texture_id, ImVec2(128,128));
+   ImGui::Text("Click the button below to get prefer parameters.");
    if (ImGui::Button("Reset Scene"))
    {
 	   reset_scene();
    }
-   if (ImGui::Button("Reload Shaders"))
+   ImGui::End();
+   /*if (ImGui::Button("Reload Shaders"))
    {
 	   reload_shader();
-   }
+   }*/
 
    //ImGui::ShowDemoWindow();
    ImGui::Render();
@@ -167,11 +173,14 @@ void display()
 	const int box_pos_loc = 5;	// "_boxScale"
 	glUniform3f(box_pos_loc, _boxPos[0], _boxPos[1], _boxPos[2]);
 
-	const int FBM_loc = 6;	// "_FBM"
-	glUniform4f(FBM_loc, _FBM[0], _FBM[1], _FBM[2], _FBM[3]);
+	const int shape_loc = 6;	// "_shape"
+	glUniform4f(shape_loc, _shape[0], _shape[1], _shape[2], _shape[3]);
 
-	const int slider_loc = 9;	// "_slider"
-	glUniform4f(slider_loc, _slider[0], _slider[1], _slider[2], _slider[3]);
+	const int detail_loc = 9;	// "_detail"
+	glUniform3f(detail_loc, _detail[0], _detail[1], _detail[2]);
+
+	const int offset_loc = 10;	// "_offset"
+	glUniform3f(offset_loc, _offset[0], _offset[1], _offset[2]);
 
 	glBindVertexArray(quad_vao);
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -207,13 +216,24 @@ void idle()
 void reset_scene()
 {
 	viewAngle = -PI;
-	height = 0.0f;
-	_boxScale[0] = 0.5f;
+	height = -2.0f;
+	_boxScale[0] = 2.0f;
 	_boxScale[1] = 0.5f;
-	_boxScale[2] = 0.5f;
+	_boxScale[2] = 2.0f;
 	_boxPos[0] = 0.0f;
-	_boxPos[1] = 0.0f;
+	_boxPos[1] = 0.6f;
 	_boxPos[2] = 0.0f;
+	_offset[0] = 0.0f;
+	_offset[1] = 0.0f;
+	_offset[2] = 0.0f;
+	_shape[0] = 0.154f;
+	_shape[1] = 0.641f;
+	_shape[2] = 0.205f;
+	_shape[3] = 0.171f;
+	_detail[0] = 0.103f;
+	_detail[1] = 0.128f;
+	_detail[2] = 0.462f;
+
 }
 
 void reload_shader()
@@ -298,7 +318,7 @@ void initOpenGl()
 void keyboard(unsigned char key, int x, int y)
 {
 	ImGui_ImplGlut_KeyCallback(key);
-	std::cout << "key : " << key << ", x: " << x << ", y: " << y << std::endl;
+	//std::cout << "key : " << key << ", x: " << x << ", y: " << y << std::endl;
 
 	switch(key)
 	{
