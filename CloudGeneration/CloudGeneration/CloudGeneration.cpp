@@ -48,16 +48,16 @@ const float  PI = 3.141592f;
 //MeshData mesh_data;
 float time_sec = 0.0f;
 float viewAngle = -PI;
-float height = 0.0f;
+float height = -2.0f;
 bool recording = false;
 
 // slider
-float _shape[4] = { 0.0, 0.0,0.0,0.0 };
-float _detail[3] = { 0.0, 0.0,0.0 };
+float _shape[4] = { 0.154, 0.641,0.205,0.171 };
+float _detail[3] = { 0.103, 0.128,0.462 };
 
 // ray marching box info
-float _boxScale[3] = {0.5,0.5,0.5};
-float _boxPos[3] = {0.0,0.0,0.0};
+float _boxScale[3] = {2.0,0.5,2.0};
+float _boxPos[3] = {0.0,0.6,0.0};
 
 float _offset[3] = {0.0,0.0,0.0};
 
@@ -70,30 +70,6 @@ void ReloadNoiseTexture();
 void draw_gui()
 {
    ImGui_ImplGlut_NewFrame();
-   //const int filename_len = 256;
-   //static char video_filename[filename_len] = "capture.mp4";
-
-   //ImGui::InputText("Video filename", video_filename, filename_len);
-   //ImGui::SameLine();
-   //if (recording == false)
-   //{
-   //   if (ImGui::Button("Start Recording"))
-   //   {
-   //      const int w = glutGet(GLUT_WINDOW_WIDTH);
-   //      const int h = glutGet(GLUT_WINDOW_HEIGHT);
-   //      recording = true;
-   //      start_encoding(video_filename, w, h); //Uses ffmpeg
-   //   }
-   //   
-   //}
-   //else
-   //{
-   //   if (ImGui::Button("Stop Recording"))
-   //   {
-   //      recording = false;
-   //      finish_encoding(); //Uses ffmpeg
-   //   }
-   //}
    ImGui::Begin("Cloud Parameters");
    ImGui::SliderFloat("Cam height", &height, -2.0f, 2.0f);
    //ImGui::SliderFloat("View angle", &viewAngle, -PI, +PI);
@@ -116,8 +92,6 @@ void draw_gui()
    {
 	   reload_shader();
    }*/
-
-   //ImGui::ShowDemoWindow();
    ImGui::Render();
  }
 
