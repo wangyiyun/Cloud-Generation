@@ -59,6 +59,10 @@ float _detail[3] = { 0.103, 0.128,0.462 };
 float _boxScale[3] = {2.0,0.5,2.0};
 float _boxPos[3] = {0.0,0.6,0.0};
 
+// color
+float _lightColor[3] = { 0.9,0.9,0.9 };
+float _cloudColor[3] = { 0.9,0.9,0.9 };
+
 float _offset[3] = {0.0,0.0,0.0};
 
 // funcs
@@ -82,16 +86,22 @@ void draw_gui()
    ImGui::Text("Please do NOT set all detail parameter to max value.");
    ImGui::SliderFloat3("Cloud Detail", _detail, 0.0f, 1.0f);
 
+   ImGui::ColorEdit3("Light Color", _lightColor);
+   ImGui::ColorEdit3("Cloud Color", _cloudColor);
+
    ImGui::Text("Click the button below to get prefer parameters.");
    if (ImGui::Button("Reset Scene"))
    {
 	   reset_scene();
    }
-   ImGui::End();
-   /*if (ImGui::Button("Reload Shaders"))
+
+   if (ImGui::Button("Reload Shaders"))
    {
 	   reload_shader();
-   }*/
+   }
+
+   ImGui::End();
+   
    ImGui::Render();
  }
 
@@ -155,6 +165,12 @@ void display()
 
 	const int offset_loc = 10;	// "_offset"
 	glUniform3f(offset_loc, _offset[0], _offset[1], _offset[2]);
+
+	const int light_color_loc = 11;	// "_lightColor"
+	glUniform3f(light_color_loc, _lightColor[0], _lightColor[1], _lightColor[2]);
+
+	const int cloud_color_loc = 12;	// "_cloudColor"
+	glUniform3f(cloud_color_loc, _cloudColor[0], _cloudColor[1], _cloudColor[2]);
 
 	glBindVertexArray(quad_vao);
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);

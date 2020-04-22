@@ -9,7 +9,7 @@ vec4 shapeData[N * N * N];
 const int M = 32;
 vec4 detailData[M * M * M];
 
-const int W_l = 8;
+const int W_l = 4;
 const int W_m = 12;
 const int W_h = 16;
 
@@ -94,12 +94,64 @@ void NoiseGen::GenWorleyGrid()
 		{
 			for (int z = 0; z < W_l; z++)
 			{
-				Worely_low[x * W_l * W_l + y * W_l + z] = vec3(x + GetRandom(),
-					y + GetRandom(),
-					z + GetRandom()) / (float)W_l;
+				if (x == 0 || x == W_l - 1 ||
+					y == 0 || y == W_l - 1 ||
+					z == 0 || z == W_l - 1)
+				{
+					Worely_low[x * W_l * W_l + y * W_l + z] = vec3(-1);
+					continue;
+				}
+				else
+				{
+					Worely_low[x * W_l * W_l + y * W_l + z] = vec3(x + GetRandom(),
+																	y + GetRandom(),
+																	z + GetRandom()) / (float)W_l;
+				}
+				
 			}
 		}
 	}
+
+	for (int x = 0; x < W_l; x++)
+	{
+		for (int y = 0; y < W_l; y++)
+		{
+			for (int z = 0; z < W_l; z++)
+			{
+				if (x == 0 || x == W_l - 1 ||
+					y == 0 || y == W_l - 1 ||
+					z == 0 || z == W_l - 1)
+				{
+					int fixX, fixY, fixZ;
+					float offsetX, offsetY, offsetZ;
+					
+					if (x == 0) { fixX = W_l - 2; offsetX = -(W_l - 2); }
+					else if (x == W_l - 1) { fixX = 1; offsetX = (W_l - 2); }
+					else { fixX = x; offsetX = 0; }
+
+					if (y == 0) { fixY = W_l - 2; offsetY = -(W_l - 2); }
+					else if (y == W_l - 1) { fixY = 1; offsetY = (W_l - 2); }
+					else { fixY = y; offsetY = 0; }
+
+					if (z == 0) { fixZ = W_l - 2; offsetZ = -(W_l - 2); }
+					else if (z == W_l - 1) { fixZ = 1; offsetZ = (W_l - 2); }
+					else { fixZ = z; offsetZ = 0; }
+
+					Worely_low[x * W_l * W_l + y * W_l + z] = Worely_low[fixX * W_l * W_l + fixY * W_l + fixZ]+vec3(offsetX, offsetY, offsetZ) / (float)W_l;
+				}
+			}
+		}
+	}
+
+	//for (int x = 0; x < W_l; x++)
+	//{
+	//	for (int y = 0; y < W_l; y++)
+	//	{
+	//		cout << Worely_low[x * W_l * W_l + y * W_l].x - x/(float)W_l << "," << Worely_low[x * W_l * W_l + y * W_l].y - y / (float)W_l << "	";
+	//	}
+	//	cout << endl;
+	//}
+
 	std::cout << "INFO: Generated low freq Worley Grid." << endl;
 
 	for (int x = 0; x < W_m; x++)
@@ -259,9 +311,10 @@ float NoiseGen::GetPerlinValue(vec3 texPos, int freq)
 float NoiseGen::GetWorleyVaule(vec3 texPos, int freq)
 {
 	// texPos: (0,1)
-	int x = floor(texPos.x * freq);
-	int y = floor(texPos.y * freq);
-	int z = floor(texPos.z * freq);
+	// map to (1, freq-2)
+	int x = floor(texPos.x * (freq - 2)) + 1;
+	int y = floor(texPos.y * (freq - 2)) + 1;
+	int z = floor(texPos.z * (freq - 2)) + 1;
 	float result = 1;
 
 	vec3 *p = NULL;
@@ -289,14 +342,9 @@ float NoiseGen::GetWorleyVaule(vec3 texPos, int freq)
 		{
 			for (int k = -1; k <= 1; k++)
 			{
-				if (x + i >= 0 && x + i < freq &&
-					y + j >= 0 && y + j < freq &&
-					z + k >= 0 && z + k < freq)
-				{
-					int offest = (x + i) * freq * freq + (y + j) * freq + (z + k);
-					float currentDist = distance(texPos, *(p+offest));
-					result = min(result, currentDist);
-				}
+				int offest = (x + i) * freq * freq + (y + j) * freq + (z + k);
+				float currentDist = distance(texPos, *(p+offest));
+				result = min(result, currentDist);
 			}
 		}
 	}

@@ -10,6 +10,8 @@ layout(location = 7) uniform sampler3D _CloudShape;
 layout(location = 8) uniform sampler3D _CloudDetail;
 layout(location = 9) uniform vec3 _detail;
 layout(location = 10) uniform vec3 _offset;
+layout(location = 11) uniform vec3 _lightColor;
+layout(location = 12) uniform vec3 _cloudColor;
 
 out vec4 fragcolor;           
 in vec2 tex_coord;
@@ -19,7 +21,6 @@ const int RAY_MARCHING_STEPS = 64;
 const float INF = 9999;
 const float EPSILON = 0.0001;
 const float PI = 3.1415926;
-const float MAX_DIST = 100;
 const vec4 skyColor = vec4(0.2,0.3,0.6,1);
 
 struct Ray
@@ -127,22 +128,22 @@ float SAT(float v)
 // need new pos calculation
 vec3 GetLocPos(vec3 pos)
 {
-//	pos = ((pos -_box.position)/(_box.scale)+1)*0.5;
-	pos = ((pos -_box.position)/(_box.scale)+vec3(1,1+abs(sin(time*0.1 + _offset.x)*sin(time*0.05 + _offset.y)*cos(time*0.15+_offset.z)),1))*0.5;
+	pos = ((pos -_box.position)/(_box.scale)+1)*0.5;
+//	pos = ((pos -_box.position)/(_box.scale)+vec3(1,1+abs(sin(time*0.1 + _offset.x)*sin(time*0.05 + _offset.y)*cos(time*0.08+_offset.z)),1))*0.5;
 	return pos;
 }
 
 vec4 GetSkyColor(float y)
 {
 	 y = y*0.5 + 0.5;
-	return mix(skyColor,vec4(0.7,0.5,0.8,1.0),y);
+	return mix(skyColor,vec4(_lightColor/2,1),y);
 }
 
 float SampleDensity(vec3 p)
 {	
 	// p is world pos
-	vec3 uvw = GetLocPos(p);
-	vec4 cloudShape =  texture(_CloudShape, (uvw));
+	vec3 shapePose = GetLocPos(p);
+	vec4 cloudShape =  texture(_CloudShape, shapePose);
 	
 	// calculate base shape density
 	// Refer: Sebastian Lague @ Code Adventure
@@ -153,20 +154,21 @@ float SampleDensity(vec3 p)
 	
 	if(shapeFBM > 0)
 	{
-
-		vec4 cloudDetail =  texture(_CloudDetail, uvw);
+		vec3 detailPos = min(vec3(0.95),max(vec3(0.05),fract(GetLocPos(p)*4)));
+		vec4 cloudDetail =  texture(_CloudDetail, detailPos);
 		// Subtract detail noise from base shape (weighted by inverse density so that edges get erodes more than center)
 		float detailErodeWeight = pow((1 - shapeFBM), 3);
-		float detailFBM = dot(cloudDetail.xyz, _detail * 0.5);
-		float density = shapeFBM - (1 - detailFBM)*detailErodeWeight*200;
-		return density*10;
+		float detailFBM = dot(cloudDetail.xyz, _detail)*0.6;
+		float density = shapeFBM - (1 - detailFBM)*detailErodeWeight*100;
+		if(density < 0) return 0;
+		else return density*10;
 	}
 
 	return -1;
 }
 
 vec3 sunDir = vec3(0,1,0);
-const int LIGHT_MARCH_NUM = 10;
+const int LIGHT_MARCH_NUM = 8;
 float lightMarch(vec3 p)
 {
 	float totalDensity = 0; 
@@ -183,14 +185,12 @@ float lightMarch(vec3 p)
 	for(int i = 0; i < LIGHT_MARCH_NUM; i++)
 	{
 		p += lightDir*stepSize;
-		totalDensity += max(0.0, SampleDensity(p)*stepSize);
+		totalDensity += max(0.0, SampleDensity(p)/8*stepSize);
 	}
-	float transmittance = exp(-totalDensity*1.5);
+	float transmittance = exp(-totalDensity*2);
 	float darknessThreshold = 0.6;
 	return darknessThreshold + transmittance*(1-darknessThreshold);
 }
-
-vec3 lightColor = vec3(0.9);
 
 void Volume(Ray ray, RayHit hit, inout vec4 result)
 {
@@ -199,39 +199,38 @@ void Volume(Ray ray, RayHit hit, inout vec4 result)
 	float len = distance(start,end);
 	float stepSize = len / float(RAY_MARCHING_STEPS);
 
+
 	vec3 eachStep =  stepSize * normalize(end - start);
 	vec3 currentPos = start;
 
-//	// debug
-//	vec3 localPos = GetLocPos(currentPos) + vec3(0,0,_detail.y);
-//	vec4 shape = texture(_CloudShape, localPos);
-//	vec4 detail = texture(_CloudDetail, localPos);
-//	if(localPos.y > _detail.x) result.xyz = vec3(shape.x);
-//	else result.xyz = vec3(detail.x);
+	// debug
+	vec3 detailPos = fract(GetLocPos(currentPos)*3) + _offset;
+	vec4 detail = texture(_CloudDetail, detailPos);
+	result.xyz = vec3(detail.x);
 
-	// exp for lighting
-	vec3 lightEnergy = vec3(0.0);
-	float transmittance = 1;
-	 for(int i = 0; i < RAY_MARCHING_STEPS; i++)
-	 {
-		float density = SampleDensity(currentPos);
-		if(density > 0)
-		{
-			float lightTransmittance = lightMarch(currentPos);
-			lightEnergy += density*stepSize*transmittance*lightTransmittance*0.857;
-			transmittance *= exp(-density*stepSize*0.643);
-
-			if(transmittance < 0.01)
-			{
-				break;
-			}
-
-		}
-		currentPos += eachStep;	 	
-	 }
-
-	 vec3 cloudColor = lightEnergy * lightColor;
-	 result.xyz = result.xyz*transmittance + cloudColor;
+//	// exp for lighting
+//	float lightEnergy = 0;
+//	float transmittance = 1;
+//	for(int i = 0; i < RAY_MARCHING_STEPS; i++)
+//	{
+//	float density = SampleDensity(currentPos);
+//	if(density > 0)
+//	{
+//		float lightTransmittance = lightMarch(currentPos);
+//		lightEnergy += density*stepSize*transmittance*lightTransmittance;
+//		transmittance *= exp(-density*stepSize*0.643);
+//
+//		if(transmittance < 0.01 || lightEnergy > 2)
+//		{
+//			break;
+//		}
+//
+//	}
+//	currentPos += eachStep;	 	
+//	}
+//
+//	 vec3 cloudColor = lightEnergy * _lightColor * _cloudColor;
+//	 result.xyz = result.xyz*transmittance + cloudColor;
 }
 
 RayHit CastRay(Ray ray)
@@ -248,7 +247,7 @@ void main(void)
 	// Get a ray for the UVs
     Ray ray = CreateCameraRay(uv);
 	vec4 result = GetSkyColor(-ray.direction.y);
-	_box = CreateBox(_boxPosition, _boxScale);
+	_box = CreateBox(_boxPosition*5, _boxScale);
 	RayHit hit = CreateRayHit();
 	hit = CastRay(ray);
 	if(hit.alpha != 0)
