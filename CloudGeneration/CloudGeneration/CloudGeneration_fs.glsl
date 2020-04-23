@@ -129,7 +129,7 @@ float SAT(float v)
 vec3 GetLocPos(vec3 pos)
 {
 	pos = ((pos -_box.position)/(_box.scale)+1)*0.5;
-//	pos = ((pos -_box.position)/(_box.scale)+vec3(1,1+abs(sin(time*0.1 + _offset.x)*sin(time*0.05 + _offset.y)*cos(time*0.08+_offset.z)),1))*0.5;
+//	pos = ((pos -_box.position)/(_box.scale)+vec3(1,1+abs(sin(time*0.1)*sin(time*0.05)*cos(time*0.08)),1))*0.5;
 	return pos;
 }
 
@@ -142,7 +142,7 @@ vec4 GetSkyColor(float y)
 float SampleDensity(vec3 p)
 {	
 	// p is world pos
-	vec3 shapePose = GetLocPos(p);
+	vec3 shapePose = min(vec3(0.95),max(vec3(0.05),fract(GetLocPos(p)*0.5*_offset.x)));
 	vec4 cloudShape =  texture(_CloudShape, shapePose);
 	
 	// calculate base shape density
@@ -154,7 +154,7 @@ float SampleDensity(vec3 p)
 	
 	if(shapeFBM > 0)
 	{
-		vec3 detailPos = min(vec3(0.95),max(vec3(0.05),fract(GetLocPos(p)*4)));
+		vec3 detailPos = min(vec3(0.95),max(vec3(0.05),fract(GetLocPos(p)*4*_offset.y)));
 		vec4 cloudDetail =  texture(_CloudDetail, detailPos);
 		// Subtract detail noise from base shape (weighted by inverse density so that edges get erodes more than center)
 		float detailErodeWeight = pow((1 - shapeFBM), 3);
@@ -203,34 +203,34 @@ void Volume(Ray ray, RayHit hit, inout vec4 result)
 	vec3 eachStep =  stepSize * normalize(end - start);
 	vec3 currentPos = start;
 
-	// debug
-	vec3 detailPos = fract(GetLocPos(currentPos)*3) + _offset;
-	vec4 detail = texture(_CloudDetail, detailPos);
-	result.xyz = vec3(detail.x);
+//	// debug
+//	vec3 detailPos = fract(GetLocPos(currentPos + vec3(0,0.1,0))*_offset.x*4);
+//	vec4 detail = texture(_CloudDetail, detailPos);
+//	result.xyz = vec3(detail.xyz);
 
-//	// exp for lighting
-//	float lightEnergy = 0;
-//	float transmittance = 1;
-//	for(int i = 0; i < RAY_MARCHING_STEPS; i++)
-//	{
-//	float density = SampleDensity(currentPos);
-//	if(density > 0)
-//	{
-//		float lightTransmittance = lightMarch(currentPos);
-//		lightEnergy += density*stepSize*transmittance*lightTransmittance;
-//		transmittance *= exp(-density*stepSize*0.643);
-//
-//		if(transmittance < 0.01 || lightEnergy > 2)
-//		{
-//			break;
-//		}
-//
-//	}
-//	currentPos += eachStep;	 	
-//	}
-//
-//	 vec3 cloudColor = lightEnergy * _lightColor * _cloudColor;
-//	 result.xyz = result.xyz*transmittance + cloudColor;
+	// exp for lighting
+	float lightEnergy = 0;
+	float transmittance = 1;
+	for(int i = 0; i < RAY_MARCHING_STEPS; i++)
+	{
+	float density = SampleDensity(currentPos);
+	if(density > 0)
+	{
+		float lightTransmittance = lightMarch(currentPos);
+		lightEnergy += density*stepSize*transmittance*lightTransmittance;
+		transmittance *= exp(-density*stepSize*0.643);
+
+		if(transmittance < 0.01 || lightEnergy > 2)
+		{
+			break;
+		}
+
+	}
+	currentPos += eachStep;	 	
+	}
+
+	 vec3 cloudColor = lightEnergy * _lightColor * _cloudColor;
+	 result.xyz = result.xyz*transmittance + cloudColor;
 }
 
 RayHit CastRay(Ray ray)
@@ -256,23 +256,3 @@ void main(void)
 	}
 	fragcolor = result;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

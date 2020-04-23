@@ -48,22 +48,22 @@ const float  PI = 3.141592f;
 //MeshData mesh_data;
 float time_sec = 0.0f;
 float viewAngle = -PI;
-float height = -2.0f;
+float height = 2.0f;
 bool recording = false;
 
 // slider
-float _shape[4] = { 0.154, 0.641,0.205,0.171 };
-float _detail[3] = { 0.103, 0.128,0.462 };
+float _shape[4] = { 0.159, 0.5,0.25,0.174 };
+float _detail[3] = { 0.615, 0.369,0.379 };
 
 // ray marching box info
-float _boxScale[3] = {2.0,0.5,2.0};
-float _boxPos[3] = {0.0,0.6,0.0};
+float _boxScale[3] = {2.0,2.0,2.0};
+float _boxPos[3] = {0.0,-0.5,0.4};
 
 // color
-float _lightColor[3] = { 0.9,0.9,0.9 };
-float _cloudColor[3] = { 0.9,0.9,0.9 };
+float _lightColor[3] = { 0.804,0.771,0.662 };
+float _cloudColor[3] = { 0.809,0.734,0.819 };
 
-float _offset[3] = {0.0,0.0,0.0};
+float _offset[3] = {2.0,1.385,0.0};
 
 // funcs
 void reload_shader();
@@ -77,10 +77,10 @@ void draw_gui()
    ImGui::Begin("Cloud Parameters");
    ImGui::SliderFloat("Cam height", &height, -2.0f, 2.0f);
    //ImGui::SliderFloat("View angle", &viewAngle, -PI, +PI);
-   ImGui::SliderFloat3("Box Scale", _boxScale, 0.1f, 2.0f);
+   ImGui::SliderFloat3("Box Scale", _boxScale, 0.1f, 5.0f);
    ImGui::SliderFloat3("Box Pos", _boxPos, -1.0f, 1.0f);
    ImGui::Text("Offset of the 4D sampling.");
-   ImGui::SliderFloat3("Offset", _offset, -1.0f, 1.0f);
+   ImGui::SliderFloat3("Offset", _offset, 0.0f, 2.0f);
    ImGui::Text("Give the basic shape of the cloud.");
    ImGui::SliderFloat4("Cloud Shape", _shape, 0.0f, 1.0f);
    ImGui::Text("Please do NOT set all detail parameter to max value.");
@@ -206,23 +206,23 @@ void idle()
 void reset_scene()
 {
 	viewAngle = -PI;
-	height = -2.0f;
+	height = 2.0f;
 	_boxScale[0] = 2.0f;
-	_boxScale[1] = 0.5f;
+	_boxScale[1] = 2.0f;
 	_boxScale[2] = 2.0f;
 	_boxPos[0] = 0.0f;
-	_boxPos[1] = 0.6f;
-	_boxPos[2] = 0.0f;
-	_offset[0] = 0.0f;
-	_offset[1] = 0.0f;
+	_boxPos[1] = -0.5f;
+	_boxPos[2] = 0.4f;
+	_offset[0] = 2.0f;
+	_offset[1] = 1.385f;
 	_offset[2] = 0.0f;
-	_shape[0] = 0.154f;
-	_shape[1] = 0.641f;
-	_shape[2] = 0.205f;
-	_shape[3] = 0.171f;
-	_detail[0] = 0.103f;
-	_detail[1] = 0.128f;
-	_detail[2] = 0.462f;
+	_shape[0] = 0.159f;
+	_shape[1] = 0.5f;
+	_shape[2] = 0.25f;
+	_shape[3] = 0.174f;
+	_detail[0] = 0.615f;
+	_detail[1] = 0.369f;
+	_detail[2] = 0.379f;
 
 }
 
