@@ -60,9 +60,6 @@
     <ClInclude Include="imgui-master\imstb_truetype.h">
       <Filter>imgui</Filter>
     </ClInclude>
-    <ClInclude Include="include\trackball.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="NoiseGen.h">
       <Filter>Header Files</Filter>
     </ClInclude>

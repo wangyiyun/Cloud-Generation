@@ -38,8 +38,6 @@ float Remap(float v, float l0, float h0, float ln, float hn)
 	return ln + ((v - l0) * (hn - ln)) / (h0 - l0);
 }
 
-//assuming that the data at hand is a 256x256x256 unsigned byte data
-//int XDIM = 32, YDIM = 32, ZDIM = 32;
 bool LoadVolumeFromFile(const char* fileName, GLuint& tex, int dataSizeX, int dataSizeY, int dataSizeZ) {
 	FILE* pFile = fopen(fileName, "rb");
 	if (NULL == pFile) {

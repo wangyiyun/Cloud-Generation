@@ -159,7 +159,6 @@
     <ClInclude Include="imgui-master\imstb_textedit.h" />
     <ClInclude Include="imgui-master\imstb_truetype.h" />
     <ClInclude Include="imgui_impl_glut.h" />
-    <ClInclude Include="include\trackball.h" />
     <ClInclude Include="InitShader.h" />
     <ClInclude Include="LoadMesh.h" />
     <ClInclude Include="LoadTexture.h" />

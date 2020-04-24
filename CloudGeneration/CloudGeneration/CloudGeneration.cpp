@@ -18,7 +18,6 @@ using namespace std;
 #include "LoadTexture.h"
 #include "imgui_impl_glut.h"
 #include "VideoMux.h"
-#include "include/trackball.h"
 #include "NoiseGen.h"
 
 //names of the shader files to load
@@ -34,14 +33,6 @@ GLuint quad_vbo = -1;
 GLuint quad_texture = -1;  // Texture rendered into
 GLuint cloud_shape = -1;  // Texture rendered into
 GLuint cloud_detail = -1;  // Texture rendered into
-
-////names of the mesh and texture files to load
-//static const std::string mesh_name = "Amago0.obj";
-//static const std::string texture_name = "AmagoT.bmp";
-
-//some trackball variables -> used in mouse feedback
-TrackBallC trackball;
-bool mouseLeft, mouseMid, mouseRight;
 
 const float  PI = 3.141592f;
 
@@ -63,7 +54,7 @@ float _boxPos[3] = {0.0,-0.5,0.4};
 float _lightColor[3] = { 0.804,0.771,0.662 };
 float _cloudColor[3] = { 0.809,0.734,0.819 };
 
-float _offset[3] = {2.0,1.385,0.0};
+float _offset[3] = {1.0,1.385,0.0};
 
 // funcs
 void reload_shader();
@@ -76,15 +67,15 @@ void draw_gui()
    ImGui_ImplGlut_NewFrame();
    ImGui::Begin("Cloud Parameters");
    ImGui::SliderFloat("Cam height", &height, -2.0f, 2.0f);
-   //ImGui::SliderFloat("View angle", &viewAngle, -PI, +PI);
    ImGui::SliderFloat3("Box Scale", _boxScale, 0.1f, 5.0f);
    ImGui::SliderFloat3("Box Pos", _boxPos, -1.0f, 1.0f);
-   ImGui::Text("Offset of the 4D sampling.");
-   ImGui::SliderFloat3("Offset", _offset, 0.0f, 2.0f);
    ImGui::Text("Give the basic shape of the cloud.");
-   ImGui::SliderFloat4("Cloud Shape", _shape, 0.0f, 1.0f);
+   ImGui::SliderFloat4("Cloud Shape FBM", _shape, 0.0f, 1.0f);
+   ImGui::SliderFloat("Cloud Shape Scale", &_offset[0], 0.1f, 1.0f);
+   ImGui::Text("Add details to the cloud.");
    ImGui::Text("Please do NOT set all detail parameter to max value.");
-   ImGui::SliderFloat3("Cloud Detail", _detail, 0.0f, 1.0f);
+   ImGui::SliderFloat3("Cloud Detail FBM", _detail, 0.0f, 1.0f);
+   ImGui::SliderFloat("Cloud Detail Scale", &_offset[1], 0.1f, 2.0f);
 
    ImGui::ColorEdit3("Light Color", _lightColor);
    ImGui::ColorEdit3("Cloud Color", _cloudColor);
@@ -95,10 +86,10 @@ void draw_gui()
 	   reset_scene();
    }
 
-   if (ImGui::Button("Reload Shaders"))
-   {
-	   reload_shader();
-   }
+   //if (ImGui::Button("Reload Shaders"))
+   //{
+	  // reload_shader();
+   //}
 
    ImGui::End();
    
@@ -130,7 +121,6 @@ void display()
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 	glMatrixMode(GL_MODELVIEW);
-	trackball.Set3DViewCamera();
 
 	const float radius = 1.0f;
 	float camX = sin(viewAngle) * radius;
@@ -173,7 +163,6 @@ void display()
 	glUniform3f(cloud_color_loc, _cloudColor[0], _cloudColor[1], _cloudColor[2]);
 
 	glBindVertexArray(quad_vao);
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
          
 	draw_gui();
@@ -213,7 +202,7 @@ void reset_scene()
 	_boxPos[0] = 0.0f;
 	_boxPos[1] = -0.5f;
 	_boxPos[2] = 0.4f;
-	_offset[0] = 2.0f;
+	_offset[0] = 1.0f;
 	_offset[1] = 1.385f;
 	_offset[2] = 0.0f;
 	_shape[0] = 0.159f;
@@ -223,7 +212,12 @@ void reset_scene()
 	_detail[0] = 0.615f;
 	_detail[1] = 0.369f;
 	_detail[2] = 0.379f;
-
+	_lightColor[0] = 0.804f;
+	_lightColor[1] = 0.771f;
+	_lightColor[2] = 0.662f;
+	_cloudColor[0] = 0.809f;
+	_cloudColor[1] = 0.734f;
+	_cloudColor[2] = 0.819f;
 }
 
 void reload_shader()
@@ -268,13 +262,6 @@ void initOpenGl()
 
 	reload_shader();
 
-	//Load a mesh and a texture
-	//mesh_data = LoadMesh(mesh_name); //Helper function: Uses Open Asset Import library.
-	//texture_id = LoadTexture(texture_name.c_str()); //Helper function: Uses FreeImage library
-
-	// Generate noise texture in compute shader
-	// do something...£¿
-
 	// Generate quad
 	glGenVertexArrays(1, &quad_vao);
 	glBindVertexArray(quad_vao);
@@ -308,7 +295,6 @@ void initOpenGl()
 void keyboard(unsigned char key, int x, int y)
 {
 	ImGui_ImplGlut_KeyCallback(key);
-	//std::cout << "key : " << key << ", x: " << x << ", y: " << y << std::endl;
 
 	switch(key)
 	{
@@ -342,45 +328,12 @@ void special(int key, int x, int y)
 void motion(int x, int y)
 {
 	ImGui_ImplGlut_MouseMotionCallback(x, y);
-	if (mouseLeft)  trackball.Rotate(x, y);
-	if (mouseMid)   trackball.Translate(x, y);
-	if (mouseRight) trackball.Zoom(x, y);
 	glutPostRedisplay();
 }
 
 void mouse(int button, int state, int x, int y)
 {
 	ImGui_ImplGlut_MouseButtonCallback(button, state);
-	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN)
-	{
-		trackball.Set(true, x, y);
-		mouseLeft = true;
-	}
-	if (button == GLUT_LEFT_BUTTON && state == GLUT_UP)
-	{
-		trackball.Set(false, x, y);
-		mouseLeft = false;
-	}
-	if (button == GLUT_MIDDLE_BUTTON && state == GLUT_DOWN)
-	{
-		trackball.Set(true, x, y);
-		mouseMid = true;
-	}
-	if (button == GLUT_MIDDLE_BUTTON && state == GLUT_UP)
-	{
-		trackball.Set(true, x, y);
-		mouseMid = false;
-	}
-	if (button == GLUT_RIGHT_BUTTON && state == GLUT_DOWN)
-	{
-		trackball.Set(true, x, y);
-		mouseRight = true;
-	}
-	if (button == GLUT_RIGHT_BUTTON && state == GLUT_UP)
-	{
-		trackball.Set(true, x, y);
-		mouseRight = false;
-	}
 }
 
 void ReloadNoiseTexture()

@@ -125,14 +125,14 @@ float SAT(float v)
 	return v;
 }
 
-// need new pos calculation
 vec3 GetLocPos(vec3 pos)
 {
-	pos = ((pos -_box.position)/(_box.scale)+1)*0.5;
-//	pos = ((pos -_box.position)/(_box.scale)+vec3(1,1+abs(sin(time*0.1)*sin(time*0.05)*cos(time*0.08)),1))*0.5;
+	// sampling as 4D texture
+	pos = ((pos -_box.position)/(_box.scale)+vec3(1,1+abs(sin(time*0.1)*sin(time*0.05)*cos(time*0.08)),1))*0.5;
 	return pos;
 }
 
+// calculate background color
 vec4 GetSkyColor(float y)
 {
 	 y = y*0.5 + 0.5;
@@ -142,7 +142,7 @@ vec4 GetSkyColor(float y)
 float SampleDensity(vec3 p)
 {	
 	// p is world pos
-	vec3 shapePose = min(vec3(0.95),max(vec3(0.05),fract(GetLocPos(p)*0.5*_offset.x)));
+	vec3 shapePose = min(vec3(0.95),max(vec3(0.05),fract(GetLocPos(p)*_offset.x)));
 	vec4 cloudShape =  texture(_CloudShape, shapePose);
 	
 	// calculate base shape density
@@ -177,9 +177,8 @@ float lightMarch(vec3 p)
 	RayHit lightHit = CreateRayHit();
 	IntersectBox(lightRay, lightHit,_box);
 
+	// the distance inside the cloud box
 	float distInBox = abs(lightHit.exitPoint - lightHit.entryPoint);
-
-//	return distInBox;
 
 	float stepSize = distInBox / float(LIGHT_MARCH_NUM);
 	for(int i = 0; i < LIGHT_MARCH_NUM; i++)
@@ -199,25 +198,24 @@ void Volume(Ray ray, RayHit hit, inout vec4 result)
 	float len = distance(start,end);
 	float stepSize = len / float(RAY_MARCHING_STEPS);
 
-
 	vec3 eachStep =  stepSize * normalize(end - start);
 	vec3 currentPos = start;
 
-//	// debug
-//	vec3 detailPos = fract(GetLocPos(currentPos + vec3(0,0.1,0))*_offset.x*4);
-//	vec4 detail = texture(_CloudDetail, detailPos);
-//	result.xyz = vec3(detail.xyz);
-
-	// exp for lighting
+	// exp for lighting, beer law
+	// Refer: Sebastian Lague @ Code Adventure
+	// How much light will reflect by the cloud.
 	float lightEnergy = 0;
+	// if transmittance = 1, total transmission, which means sky's color.
 	float transmittance = 1;
 	for(int i = 0; i < RAY_MARCHING_STEPS; i++)
 	{
 	float density = SampleDensity(currentPos);
 	if(density > 0)
 	{
+		// Sample the cloud on the direction to the sun (parallel light)
 		float lightTransmittance = lightMarch(currentPos);
 		lightEnergy += density*stepSize*transmittance*lightTransmittance;
+		// larger density, smaller transmittance
 		transmittance *= exp(-density*stepSize*0.643);
 
 		if(transmittance < 0.01 || lightEnergy > 2)
